@@ -1,5 +1,39 @@
 # CombatSolver 测试清单
 
+## 2026-09-09：Windows 固定工作量性能探索
+
+环境：游戏 `0.111.0`、RitsuLib `0.5.18`、Release 基线 `3c9edc9`；独立 Windows headless 实例、Instant、首个 solver 结果停止、每个请求 120 秒总超时。未使用 VerifyIncrementalSearch。下面每项为一个独立进程样本，不是稳定中位数或可见 Steam/FPS 验收。
+
+Silent 使用 `coverage/unattended/gc-issue36-benchmark-settings.json`：Custom、每次搜索 576 节点、Beam36，固定种子 `SEARCH_PERF_SILENT_LARGE_DECK`、AEONGLASS_BOSS、Ascension5、Act2、敌 HP512 / EBB_MOVE、玩家 HP65/65 / Energy3，清空牌堆后加载 `search-performance-silent-large-deck-cards.json`。显式关闭药水与 NoGC，开启阶段测量，Short override 30000 ms。
+
+请求累计 1152 展开 / 5559 转移 / 2532 choice branches；选中阶段为 576 / 2698 / 1213，边界 NodeLimit。以下均为**请求总搜索**，MB 使用十进制，不是整个游戏进程内存：
+
+| 实验 | 总搜索 ms | worker 分配 MB | runId |
+| --- | ---: | ---: | --- |
+| 基线 DOP1 | 7534.2 | 452.136 | `2d5636180b4443eb8d1cbf9b10b88062` |
+| 基线 DOP4 | 4777.4 | 460.141 | `325b8f4a11ee43669b83eedb4db7a42e` |
+| 基线 DOP8 | 4065.3 | 462.951 | `2496e023e4034585a37ca16ffc54a7d5` |
+| 估值缓存 DOP1，已撤回 | 7063.3 | 452.498 | `19ded7c9944e44d9b7c25812ddceec6b` |
+| 延迟 RNG DOP1，已撤回 | 6770.9 | 449.696 | `ec8ee6698eb34feea295811d4c09a09d` |
+
+上述五组 Passed，逐行 17 条 ACTION（包含目标、选牌和结束回合）相同。结果中公开的工作量、choice budget、cycle/ordered counters、phase/boundary、搜索回合/洗牌、评分、投影战损、HP、敌HP及药水字段相同：score=-5322017，projectedBattleHpLost=30，finalHp=35，finalEnemyHp=512。未开启详细诊断，未独立比较未导出的所有剪枝内部计数，也未证明整场实际战损或全部状态语义等价。DOP4/DOP8 的实际最大并发分别为 4/8；并行调度指标允许不同。
+
+估值缓存总分配增加约 0.08%；延迟 RNG 仅降低约 0.54%。两项实验 Release 编译通过，但均不保留，因此未扩大到分支隔离/增量回放门禁。撤回后重新 Release 构建，0 warnings / 0 errors。源码实验补丁与原始结果留在本地 `.local/perf-root/`，不随源码提交。
+
+普通 GC 的暂停来自共享进程窗口，不能作独占 worker 归因。DOP4→8 的单次耗时下降 14.9%，分配增加 0.61%；不据此改变默认 DOP4 或声称通用 15% 加速。
+
+哨兵改用 NECROBINDER 起始牌组，固定 `SEARCH_PERF_NECROBINDER_STARTER_POTION` / AEONGLASS_BOSS / Ascension10 / Act2 / 敌HP526 / 玩家HP41；`CardsJson=[]` 保留正常发牌，注入 GAMBLERS_BREW 与 COLORLESS_POTION，Smart / NoGC4GB，其余工作量与停止规则相同。此场景用于比较线程数，不是历史药水大牌组 fixture。
+
+| 药水哨兵 | 总搜索 ms | worker 分配 MB | runId |
+| --- | ---: | ---: | --- |
+| 基线 DOP4 | 2436.1 | 1470.494 | `9daaaf2744e448c99271cfdc72f07763` |
+| 基线 DOP8 | 2216.1 | 1971.914 | `0a82c8e725e841f1b2848dd918ff20ae` |
+
+两组 Passed，实际最大并发分别为 4/8。请求累计 1728 展开 / 9402 转移 / 4396 choice branches、15 条完整 ACTION，以及上面列明的非时序结果字段逐项相同；两组均仅发现死亡路线。DOP8 单次耗时少 9.0%，总分配多 34.1%。这说明扩充 worker 的收益具有场景依赖，不能把大牌组的较小分配增幅泛化到高选择/药水请求；保持当前生产默认和玩家设置。
+
+准备阶段两次失败均发生在搜索之前，不计入性能表：UNC RunSnapshotPath 经 PowerShell Resolve-Path.Path 携带 provider 前缀，改用本地 Windows 路径后发现历史部分快照缺少完整 SerializableRun 所需角色信息。随后改为上述独立建局，不补造旧存档字段，也不把旧 fixture 记为本轮通过。
+
+
 ## 2026-09-09：可达手牌估值分配（开发中）
 
 - `dotnet run --project tools/ReachableHandValueChecks/ReachableHandValueChecks.csproj -c Release`：32,551 组与原二维 DP 精确相等，包含空手牌、免费牌、双资源、较大数组回退、负可用资源、重复牌和价值和溢出。测试直接链接生产纯计算源码，原递推作为对照。
