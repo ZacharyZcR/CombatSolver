@@ -1173,6 +1173,7 @@ internal static class CombatBugReportExporter
             settings.FinalBossHpStrategy,
             settings.AcceptableBattleHpLoss,
             settings.Objective,
+            settings.Archetypes,
             settings.GrowthBudgets,
             settings.IgnoreLongTermRewards,
             searchMaxDegreeOfParallelism = UnattendedTestRunner.SearchMaxDegreeOfParallelismOverride ?? settings.SearchMaxDegreeOfParallelism,
@@ -1219,6 +1220,7 @@ internal static class CombatBugReportExporter
         {
             SoftTimeBudgetMilliseconds = policy.DeepBudgetOverrideMilliseconds ?? policy.DeepProfile.SoftTimeBudgetMilliseconds,
         }, JsonOptions);
+        captured["archetype"] = JsonSerializer.SerializeToNode(policy.Archetype, JsonOptions);
         captured["objective"] = JsonSerializer.SerializeToNode(policy.Objective, JsonOptions);
         captured["forceShortOnly"] = policy.ForceShortOnly;
         captured["searchMaxDegreeOfParallelism"] = policy.MaxDegreeOfParallelism;

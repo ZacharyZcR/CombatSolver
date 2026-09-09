@@ -31,8 +31,10 @@ internal static class RunAdvicePresentation
             $"reward:{i}", AdviceKind.Card, c.Card.Id.Entry, Card: RunAdviceCapture.Card(c.Card)))
             .Concat(alternatives.Any(a => a.OptionId.Equals("Skip", StringComparison.OrdinalIgnoreCase))
                 ? [new AdviceOffer("skip", AdviceKind.Skip, "skip")] : Array.Empty<AdviceOffer>()).ToArray();
-        AdviceContext context = RunAdviceCapture.Capture(player);
+        AdviceContext context = RunAdviceCapture.Capture(player) with
+        { Preference = SolverSettings.Current.Archetypes.For(player.Character.Id.Entry) };
         AdviceRating[] ratings = RunAdvice.Rank(context, offers, false);
+        ShowArchetypeSelector(screen, player, () => Reward(screen, options, alternatives));
         var holders = screen.GetNode<Control>("UI/CardRow").GetChildren()
             .OfType<NGridCardHolder>().Where(c => !c.IsQueuedForDeletion()).ToArray();
         for (int i = 0; i < Math.Min(options.Count, holders.Length); i++)
@@ -54,14 +56,38 @@ internal static class RunAdvicePresentation
             "评分越高越优先 · 跳过基准为 0 分\n启发式评分，非百分制或胜率", reward: true, profile: DeckMechanismProfile.Capture(context));
     }
 
+    private static void ShowArchetypeSelector(Control owner, Player player, Action refresh)
+    {
+        var selector = owner.GetNodeOrNull<SolverArchetypeSelector>("CombatSolverArchetypeSelector");
+        if (selector is null)
+        {
+            selector = new SolverArchetypeSelector();
+            owner.AddChild(selector);
+            selector.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomLeft);
+            selector.Position = new Vector2(24, owner.Size.Y - 190);
+            selector.Size = new Vector2(280, 90);
+        }
+        string character = player.Character.Id.Entry;
+        selector.Refresh(character, SolverSettings.Current.Archetypes.For(character), false, preference =>
+        {
+            SolverController.SetArchetypePreference(character, preference);
+            Callable.From(() =>
+            {
+                if (GodotObject.IsInstanceValid(owner) && owner.IsInsideTree() && !owner.IsQueuedForDeletion()) refresh();
+            }).CallDeferred();
+        });
+    }
+
     internal static void Shop(NMerchantInventory shop)
     {
         if (CurrentPlayer() is not { } player || shop.Inventory is null) return;
         NMerchantSlot[] slots = shop.GetAllSlots().ToArray();
         AdviceOffer[] offers = slots.Select((s, i) => RunAdviceCapture.Offer(s.Entry, i))
             .Append(new AdviceOffer("save", AdviceKind.Skip, "save")).ToArray();
-        AdviceContext context = RunAdviceCapture.Capture(player);
+        AdviceContext context = RunAdviceCapture.Capture(player) with
+        { Preference = SolverSettings.Current.Archetypes.For(player.Character.Id.Entry) };
         AdviceRating[] ratings = RunAdvice.Rank(context, offers, true);
+        ShowArchetypeSelector(shop, player, () => Shop(shop));
         for (int i = 0; i < slots.Length; i++)
         {
             if (!slots[i].Entry.IsStocked) { RunAdviceBadge.Clear(slots[i]); continue; }

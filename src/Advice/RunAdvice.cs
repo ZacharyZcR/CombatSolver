@@ -23,7 +23,7 @@ internal sealed record AdviceCard(
 internal sealed record AdviceContext(
     IReadOnlyList<AdviceCard> Deck, IReadOnlySet<string> Relics,
     int Gold, int Hp, int MaxHp, int Act, int EmptyPotionSlots,
-    double StartingStars = 0, double SummonSupply = 0, double InitialFocusOrbs = 0, int BaseEnergy = 3);
+    double StartingStars = 0, double SummonSupply = 0, double InitialFocusOrbs = 0, int BaseEnergy = 3, ArchetypePreference Preference = ArchetypePreference.Automatic);
 
 internal sealed record AdviceOffer(
     string Key, AdviceKind Kind, string Id, int Cost = 0,
@@ -172,6 +172,9 @@ internal static class RunAdvice
         }
         if (synergy > 0) reasons.Add("契合现有体系");
         synergy += AdviceMechanics.Value(context, card, reasons);
+        double preferenceBonus = ArchetypeCatalog.AdviceBonus(context, card);
+        synergy += preferenceBonus;
+        if (preferenceBonus > 0) reasons.Add("符合手动流派倾向（温和加权）");
         if ((context.Relics.Contains("KUNAI") || context.Relics.Contains("SHURIKEN")
                 || context.Relics.Contains("ORNAMENTAL_FAN")) && card.Attack && !card.EnergyX && card.Cost <= 1)
         { synergy += 4; reasons.Add("配合连续攻击遗物"); }

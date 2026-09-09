@@ -7,6 +7,60 @@ void Check(bool condition, string message)
     if (!condition) throw new InvalidOperationException(message);
     checks++;
 }
+var preferences = new ArchetypePreferences().With("SILENT", ArchetypePreference.Shiv);
+Check(System.Text.Json.JsonSerializer.Deserialize<ArchetypePreferences>(System.Text.Json.JsonSerializer.Serialize(preferences)) == preferences,
+    "Per-character preference survives settings serialization");
+Check(preferences.For("SILENT") == ArchetypePreference.Shiv && preferences.For("IRONCLAD") == ArchetypePreference.Automatic,
+    "Archetype settings are isolated by character");
+Check(new ArchetypePreferences(Silent: ArchetypePreference.Forge).For("SILENT") == ArchetypePreference.Automatic,
+    "Cross-character persisted values fall back to Automatic");
+Check(new ArchetypePreferences(Silent: (ArchetypePreference)999).For("SILENT") == ArchetypePreference.Automatic,
+    "Unknown persisted values fall back to Automatic");
+Check(ArchetypeCatalog.Normalize("CUSTOM", ArchetypePreference.Shiv) == ArchetypePreference.Automatic,
+    "Unreviewed characters are not assigned vanilla archetypes");
+foreach (var (character, preference, id, roles) in new[]
+{
+    ("IRONCLAD", ArchetypePreference.Strength, "INFLAME", AdviceRole.StrengthSource),
+    ("IRONCLAD", ArchetypePreference.Exhaust, "DARK_EMBRACE", AdviceRole.ExhaustPayoff),
+    ("SILENT", ArchetypePreference.Poison, "DEADLY_POISON", AdviceRole.PoisonSource),
+    ("SILENT", ArchetypePreference.Shiv, "ACCURACY", AdviceRole.ShivPayoff),
+    ("SILENT", ArchetypePreference.Discard, "ACROBATICS", AdviceRole.DiscardSource),
+    ("REGENT", ArchetypePreference.Stars, "GLOW", AdviceRole.None),
+    ("REGENT", ArchetypePreference.Forge, "BIG_BANG", AdviceRole.ForgeSource),
+    ("NECROBINDER", ArchetypePreference.Doom, "END_OF_DAYS", AdviceRole.DoomSource),
+    ("NECROBINDER", ArchetypePreference.Soul, "HAUNT", AdviceRole.SoulPlayPayoff),
+    ("NECROBINDER", ArchetypePreference.Summon, "BODYGUARD", AdviceRole.SummonSource),
+    ("DEFECT", ArchetypePreference.FocusOrbs, "DEFRAGMENT", AdviceRole.FocusSource),
+})
+{
+    Check(ArchetypeCatalog.Supports(character, preference), "Character menu contains its reviewed archetype");
+    var card = new AdviceCard(id, 0, 0, 0, 1, false, false, false, true, AdviceTag.None,
+        Roles: roles, Stars: preference == ArchetypePreference.Stars ? 1 : 0);
+    var automatic = context with { Gold = 200 };
+    var chosen = automatic with { Preference = preference };
+    var offer = new AdviceOffer("test", AdviceKind.Card, id, Cost: 50, Card: card);
+    foreach (bool shop in new[] { false, true })
+    {
+        double delta = RunAdvice.Rank(chosen, [offer], shop)[0].Score - RunAdvice.Rank(automatic, [offer], shop)[0].Score;
+        Check(Math.Abs(delta - 5) < 1e-9, "Explicit preference affects both reward and shop scores by a bounded bonus");
+    }
+    Check(ArchetypeCatalog.AdviceBonus(chosen with { Deck = [card, card, card, card] }, card) < 5,
+        "Preference saturates instead of forcing excessive copies");
+    Check(ArchetypeCatalog.AdviceBonus(chosen, card with { Known = false }) == 0
+        && ArchetypeCatalog.AdviceBonus(chosen, card with { Curse = true }) == 0,
+        "Unknown cards and curses receive no preference bonus");
+    Check(ArchetypeCatalog.ActionBonus(preference, id) > 0 && ArchetypeCatalog.ActionBonus(ArchetypePreference.Automatic, id) == 0,
+        "Matching combat actions get a tie-break while Automatic preserves ordering");
+    Check(!RunAdvice.Rank(chosen with { Gold = 0 }, [offer], true)[0].Available,
+        "Preference cannot bypass purchase affordability");
+}
+Check(ArchetypeCatalog.SetupBonus(ArchetypePreference.Exhaust, "DarkEmbracePower", 0) == 0,
+    "No exhaust draw potential means no favored setup bonus");
+Check(ArchetypeCatalog.SetupBonus(ArchetypePreference.Shiv, "AccuracyPower", 10000) == 8,
+    "Persistent setup preference is capped");
+Check(ArchetypeCatalog.SetupBonus(ArchetypePreference.Automatic, "AccuracyPower", 10000) == 0
+    && ArchetypeCatalog.SetupBonus(ArchetypePreference.Poison, "AccuracyPower", 10000) == 0,
+    "Automatic and unrelated mechanisms keep existing setup values");
 double Score(int gold, int cost) => RunAdvice.Rank(context with { Gold = gold },
     [new("relic", AdviceKind.Relic, "VAJRA", cost)], true)[0].Score;
 

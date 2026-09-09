@@ -3650,6 +3650,8 @@ internal sealed partial class CombatBeamSolver
         int block = Math.Max(0, after.PlayerBlock - before.PlayerBlock);
         double resource = Math.Max(0.5d, energy + stars * 0.5d);
         double normalized = (damage + block * 0.8d) / resource;
+        if (policy.Archetype != ArchetypePreference.Automatic)
+            normalized += ArchetypeCatalog.ActionBonus(policy.Archetype, node.Action?.CardId);
         CombatPredictionSimulator simulator = (CombatPredictionSimulator)after.Simulator;
         bool pure = true;
         foreach (CombatPredictionHistoryEntry entry in

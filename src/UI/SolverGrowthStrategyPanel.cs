@@ -12,6 +12,7 @@ internal sealed partial class SolverGrowthStrategyPanel : PanelContainer
     private readonly Dictionary<GrowthSource, SpinBox> _budgets = [];
     private readonly List<(GrowthSourceHandle Source, SpinBox Input)> _extraBudgets = [];
     private readonly CheckButton _ignoreLongTermRewards;
+    private readonly SolverArchetypeSelector _archetype = new();
     private readonly OptionButton _objectiveMode = new() { Name = "SearchObjectiveMode" };
     private readonly SpinBox _objectiveLoss = new() { Name = "ObjectiveMaximumHpLoss" };
     private readonly SpinBox _objectiveHp = new() { Name = "ObjectiveMinimumHp" };
@@ -37,6 +38,7 @@ internal sealed partial class SolverGrowthStrategyPanel : PanelContainer
             SolverUiTokens.Radius.Medium, SolverUiTokens.Spacing.Sm, SolverUiTokens.Spacing.Sm));
         VBoxContainer layout = new() { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         layout.AddThemeConstantOverride("separation", SolverUiTokens.Spacing.Sm);
+        layout.AddChild(_archetype);
         AddObjectiveControls(layout);
         HBoxContainer ignoreRow = new() { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         Label ignoreLabel = SolverUiTokens.CreateLabel(
@@ -220,6 +222,7 @@ internal sealed partial class SolverGrowthStrategyPanel : PanelContainer
         try
         {
             SolverSettingsData settings = SolverSettings.Current;
+            _archetype.Refresh(ArchetypeSelection.Character, ArchetypeSelection.Current, disabled, ArchetypeSelection.Select);
             SearchObjectivePolicy objective = settings.Objective;
             _objectiveMode.Disabled = disabled;
             _objectiveMode.Select((int)objective.Mode);

@@ -106,3 +106,5 @@ StrategicEffectMirrors.Register<MyPower>(
 `StrategicEffectContext.ExhaustDrawPlays` 是可选的消耗抽牌机会估计，区别于 `ExhaustPlays` 的消耗触发机会。未提供时 Dark Embrace 保留旧构造的回退行为；生产快照仅在有自身 Dark Embrace 时，使用分支的有效 Power 顺序与手牌补齐该值。普通消耗在当前 NoDraw 窗口内折减，未来回合保留有界份额；手中 Ethereal 牌按回合末 NoDraw 移除与 Dark Embrace 的顺序计入，兼具 Exhaust 的实例不重复计算。它不修改模拟/历史，也不保证后续回合一定可抽到或打出所有候选。
 
 `StrategicEffectContext.Build` accepts optional `skillsExhaust` (default false). The solver supplies it from owned active Corruption; it changes exhaust fuel and generator lifetime without modifying card keywords.
+
+手动流派偏好是单独的搜索政策，不改变登记的 StrategicEffectVector。当前角色选项及匹配名单在 `ArchetypeCatalog` 中封闭维护；未知角色只显示 Automatic，未知 Power 不获得偏好加分。对原版已审查 Power 的手动偏好只在求解器聚合持续效果时施加有界保路加权，不修改终局实际收益或模拟结算。

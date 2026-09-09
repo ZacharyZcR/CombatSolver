@@ -386,10 +386,10 @@
   "最低结束血量（收益目标）": "Minimum end HP (reward modes)",
   "平衡：优先降低战略战损，同分再比较成长收益；手动成长额度可允许换血。最低血量和累计战损限制仅用于永久成长与净收益目标，默认保留 30 HP、累计战损不超过 10 HP。已有自定义限制保留。": "Balanced minimizes strategic HP loss, then compares growth rewards on ties; custom growth allowances can permit HP trades. Minimum HP and total loss limits apply only to growth and net-resource modes. Defaults: retain 30 HP, lose at most 10 HP. Existing custom limits are preserved.",
   "此路线未获得正向目标收益，按保命策略比较，不应用收益血量限制；不代表本场不存在潜在收益来源。": "This route has no positive objective gain. It falls back to survival comparison without reward HP limits; this does not rule out potential reward sources in this combat.",
-  "预计永久成长：生命 {0:+0;-0;0} · 伤害 {1:+0;-0;0} · 格挡 {2:+0;-0;0}": "Projected growth: max HP {0:+0;-0;0} \u00b7 damage {1:+0;-0;0} \u00b7 block {2:+0;-0;0}",
-  "预计收益：金币 {0:+0;-0;0} · 待结算 {1} · 选牌 {2} 次 · 药水 {3:+0;-0;0} 瓶": "Projected gains: gold {0:+0;-0;0} \u00b7 pending {1} \u00b7 card rewards {2} \u00b7 potions {3:+0;-0;0}",
-  "净收益构成：金币 {0:+0;-0;0} + 待结算 {1} + 选牌奖励分 {2} + 药水价值变化 {3:+0;-0;0} − 保命遗物消耗 {4} = {5} 分": "Net score: gold {0:+0;-0;0} + pending {1} + card reward value {2} + potion value change {3:+0;-0;0} \u2212 death-save relic cost {4} = {5}",
-  "预计结束血量 {0} HP · 本场累计战损 {1} HP": "Projected ending HP {0} \u00b7 total battle HP loss {1}",
+  "预计永久成长：生命 {0:+0;-0;0} · 伤害 {1:+0;-0;0} · 格挡 {2:+0;-0;0}": "Projected growth: max HP {0:+0;-0;0} · damage {1:+0;-0;0} · block {2:+0;-0;0}",
+  "预计收益：金币 {0:+0;-0;0} · 待结算 {1} · 选牌 {2} 次 · 药水 {3:+0;-0;0} 瓶": "Projected gains: gold {0:+0;-0;0} · pending {1} · card rewards {2} · potions {3:+0;-0;0}",
+  "净收益构成：金币 {0:+0;-0;0} + 待结算 {1} + 选牌奖励分 {2} + 药水价值变化 {3:+0;-0;0} − 保命遗物消耗 {4} = {5} 分": "Net score: gold {0:+0;-0;0} + pending {1} + card reward value {2} + potion value change {3:+0;-0;0} − death-save relic cost {4} = {5}",
+  "预计结束血量 {0} HP · 本场累计战损 {1} HP": "Projected ending HP {0} · total battle HP loss {1}",
   "以上为本次搜索路线的预测增量，不是已经到账的收益；重新搜索时重新计量。": "These are projected gains for this search route, not resources already received. A new search resets the measurement.",
   "培养目标（点，0 默认 3）": "Growth target (0 = 3 points)",
   "净收益目标（分，0 默认 25）": "Net resource target (0 = 25)",
@@ -457,5 +457,9 @@
   "力量多段配合": "Strength and multi-hit synergy",
   "力量支持多段攻击": "Strength supports multiple hits",
   "多段攻击放大力量收益": "Multiple hits amplify Strength",
-  "缺少已识别的力量来源": "No recognized Strength source"
+  "缺少已识别的力量来源": "No recognized Strength source",
+  "流派倾向": "Archetype preference",
+  "自动识别（不指定流派）": "Automatic (no forced archetype)",
+  "符合手动流派倾向（温和加权）": "Matches your selected archetype (small bonus)",
+  "流派倾向温和影响奖励、商店评分与战斗铺垫；保留生存优先和收益限制。自动识别保留多体系评分。仅列出已建模机制。": "A small preference for reward/shop choices and combat setup. Survival priorities and reward limits remain in effect. Automatic keeps multi-mechanism scoring. Only modeled mechanisms are listed."
 }

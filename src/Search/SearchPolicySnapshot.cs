@@ -22,6 +22,7 @@ internal sealed record SearchPolicySnapshot(
     SearchMemoryPressureSignal MemoryPressureSignal)
 {
     public SearchObjectivePolicy Objective { get; init; } = SearchObjectivePolicy.Default;
+    public ArchetypePreference Archetype { get; init; }
     public GrowthValues GrowthBudgets { get; init; }
     public bool HasGrowthTargets { get; init; }
 

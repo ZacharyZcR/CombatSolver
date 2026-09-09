@@ -325,3 +325,7 @@ renderer 不得重新读取 `SolverResult`、`PlanAction`、`PlanCardChoice` 或
 ### 共享卡牌机制事实
 
 `src/Strategy/CardMechanismFacts` 保存已审查的纯值机制映射，由 Advice 主线程捕获和 Search 分支评估共用。它不读取 live model、UI、设置或 RNG，不承载模拟结算；战斗评估从分支 Preview 提供参数。
+
+### 手动流派偏好
+
+`ArchetypeCatalog` 提供纯值角色选项、已审查角色匹配和有界偏好函数；`ArchetypePreferences` 为按角色持久化的不可变设置。Runtime 的 `ArchetypeSelection` 读取当前单人角色，`SolverController.SetArchetypePreference` 更新设置并取消旧策略的搜索/路线。`SolverArchetypeSelector` 只处理选项显示与回调，奖励/商店在主线程重新捕获评分。`SearchPolicySnapshot.Archetype` 冻结偏好，搜索只在候选同分排序和已有效的持续铺垫估值中使用；它进入持久化路线缓存身份，不进入战斗状态指纹或 ContinuationStamp。

@@ -256,6 +256,7 @@ internal sealed partial class CombatBeamSolver
         StrategicEffectContext? strategicContext = null;
         StrategicEffectVector strategicEffects = StrategicEffectVector.Zero;
         int offensivePersistentBuffValue = 0;
+        int archetypeSetupValue = 0;
         PersistentSetupTraits persistentSetupTraits = PersistentSetupTraits.None;
         for (int powerIndex = 0; powerIndex < effectivePowers.Count; powerIndex++)
         {
@@ -273,10 +274,12 @@ internal sealed partial class CombatBeamSolver
                 power,
                 strategicContext.Value);
             strategicEffects += effect;
+            if (policy.Archetype != ArchetypePreference.Automatic)
+                archetypeSetupValue += ArchetypeCatalog.SetupBonus(policy.Archetype, power.GetType().Name, effect.RetentionValue);
             offensivePersistentBuffValue += effect.DamagePotential + effect.ScalingPotential;
             persistentSetupTraits |= PersistentPowerSetupTrait(power);
         }
-        int persistentBuffValue = strategicEffects.RetentionValue;
+        int persistentBuffValue = strategicEffects.RetentionValue + Math.Min(16, archetypeSetupValue);
         if (playerState.OrbQueue.Orbs.Count > 0)
         {
             persistentSetupTraits |= PersistentSetupTraits.OrbEngine;

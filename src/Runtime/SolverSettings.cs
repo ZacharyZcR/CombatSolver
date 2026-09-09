@@ -75,6 +75,7 @@ internal sealed record SolverSettingsData
     public SolverPotionPolicy PotionPolicy { get; init; } = SolverPotionPolicy.Smart;
     public PersistedPotionDirective[] PotionDirectives { get; init; } = [];
     public SearchObjectivePolicy Objective { get; init; } = SearchObjectivePolicy.Default;
+    public ArchetypePreferences Archetypes { get; init; } = new();
     public GrowthValues GrowthBudgets { get; init; }
     /// <summary>
     /// 不考虑局外收益。打开后搜索既不为金币、永久升级这类战斗外收益付出任何血量，也不再用它们
@@ -136,6 +137,7 @@ internal sealed record SolverSettingsSnapshot(
     double DeploymentInterActionDelaySeconds)
 {
     public SearchObjectivePolicy Objective { get; init; } = SearchObjectivePolicy.Default;
+    public ArchetypePreferences Archetypes { get; init; } = new();
     public GrowthValues GrowthBudgets { get; init; }
     public bool IgnoreLongTermRewards { get; init; }
 }
@@ -304,6 +306,7 @@ internal static class SolverSettings
             data.DeploymentInterActionDelaySeconds ?? 0d)
         {
             Objective = data.Objective,
+            Archetypes = data.Archetypes,
             GrowthBudgets = data.GrowthBudgets,
             IgnoreLongTermRewards = data.IgnoreLongTermRewards,
         };
@@ -557,6 +560,7 @@ internal static class SolverSettings
             throw new InvalidDataException(
                 $"{nameof(data.AcceptableBattleHpLoss)} must be between 0 and {MaximumAcceptableBattleHpLoss}.");
         }
+        if (data.Archetypes is null) throw new InvalidDataException("Archetype preferences cannot be null.");
         data.Objective.Validate();
         data.GrowthBudgets.ValidateBudgets();
         HashSet<(int Slot, string PotionId)> potionDirectiveKeys = [];

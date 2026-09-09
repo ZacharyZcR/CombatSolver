@@ -498,6 +498,8 @@ internal static class SolverController
             // 这里记的是玩家填的原始值；「不考虑局外收益」的折算交给快照上的 Effective* 一处做，
             // 免得两边各判一次而走岔。问题包里两样都在，方便看出当时是填了额度还是开了开关。
             Objective = settings.Objective,
+            Archetype = settings.Archetypes.For((LocalContext.GetMe(state)
+                ?? throw new InvalidOperationException("No local player for archetype capture.")).Character.Id.Entry),
             GrowthBudgets = settings.GrowthBudgets,
             HasGrowthTargets = settings.GrowthBudgets.IsEnabled
                 || state.Players.SelectMany(player => player.PlayerCombatState!.AllCards).Any(GrowthValues.HasTarget),
@@ -1698,6 +1700,32 @@ internal static class SolverController
         SolverOverlay.RefreshControls();
         if (!_combat.AutomaticSearchPaused && AutomaticCalculationEnabled)
             RequestSearch(host, state, SearchReason.Manual);
+    }
+
+    internal static void SetArchetypePreference(string character, ArchetypePreference preference)
+    {
+        AssertMainThread();
+        if (_deployment != null) return;
+        var current = SolverSettings.Current;
+        var updated = current.Archetypes.With(character, preference);
+        if (updated == current.Archetypes) return;
+        SolverSettings.Update(current with { Archetypes = updated });
+        _combat.StoppedSearch = null;
+        CancelDeferredSearch();
+        CancelSearch();
+        _combat.LatestResult = null;
+        _combat.LatestStamp = null;
+        _combat.ContinuationSource = null;
+        _combat.PendingCompleteProjectionBaseline = null;
+        _combat.PendingManualProjectionBaseline = null;
+        if (NGame.Instance is { } host && CombatManager.Instance.IsInProgress
+            && CombatManager.Instance.DebugOnlyGetState() is { } state)
+        {
+            SolverOverlay.ShowManualCalculationReady(host, hasPreviousCalculation: false);
+            if (!_combat.AutomaticSearchPaused && AutomaticCalculationEnabled)
+                RequestSearch(host, state, SearchReason.Manual);
+        }
+        SolverOverlay.RefreshControls();
     }
 
     internal static void SetSearchObjective(NGame host, CombatState state, SearchObjectivePolicy objective)
