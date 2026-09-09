@@ -166,10 +166,11 @@ internal sealed class PredictionStateStore
 
         if (_states is not null)
         {
-            (AbstractModel Model, Type StateType)[] keys = _states.Keys
-                .Where(key => ReferenceEquals(key.Model, resolvedSource))
-                .ToArray();
-            foreach ((AbstractModel _, Type stateType) in keys)
+            List<Type>? types = null;
+            foreach (var key in _states.Keys)
+                if (ReferenceEquals(key.Model, resolvedSource))
+                    (types ??= []).Add(key.StateType);
+            foreach (Type stateType in types ?? Enumerable.Empty<Type>())
             {
                 object state = _states[(resolvedSource, stateType)];
                 _states.Remove((resolvedSource, stateType));
@@ -179,13 +180,11 @@ internal sealed class PredictionStateStore
         }
 
         _modelAliases ??= [];
-        foreach (AbstractModel alias in _modelAliases
-                     .Where(pair => ReferenceEquals(pair.Value, resolvedSource))
-                     .Select(pair => pair.Key)
-                     .ToArray())
-        {
-            _modelAliases[alias] = resolvedReplacement;
-        }
+        // Replacing existing values does not invalidate Dictionary enumeration on .NET 9.
+        // Add new aliases only after this loop.
+        foreach (var alias in _modelAliases)
+            if (ReferenceEquals(alias.Value, resolvedSource))
+                _modelAliases[alias.Key] = resolvedReplacement;
         _modelAliases[source] = resolvedReplacement;
         _modelAliases[resolvedSource] = resolvedReplacement;
     }

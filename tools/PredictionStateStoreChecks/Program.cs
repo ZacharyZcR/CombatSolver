@@ -162,6 +162,20 @@ internal static class StoreChecks
         aliasOnlyFork.Get<Counter>(original).Value = 9;
         Require(aliasOnlyFork.Get<Counter>(final).Value == 9 && !aliasOnly.TryGetReadOnly<Counter>(final, out _),
             "Empty alias-only store lost mapping/isolation.");
+        PredictionStateStore manyAliases = new();
+        List<AbstractModel> aliases = [original];
+        Counter shared = manyAliases.Get<Counter>(original);
+        AbstractModel previous = original;
+        for (int index = 0; index < 32; index++)
+        {
+            AbstractModel next = new($"alias-{index}");
+            manyAliases.RemapModel(previous, next);
+            aliases.Add(next);
+            foreach (AbstractModel alias in aliases)
+                Require(ReferenceEquals(shared, manyAliases.Get<Counter>(alias)),
+                    "Updating alias values while enumerating lost a mapping.");
+            previous = next;
+        }
         PredictionStateStore collision = new();
         collision.Get<Counter>(original);
         collision.Get<Counter>(final);
