@@ -6,6 +6,8 @@
 
 ## 专题
 
+- [当前缓存审查与优化顺序](cache-audit-20260909.md)：缓存所有权、预测洗牌候选、观测缺口与路线更新限制。
+
 - [Ritsu 目标类型查询缓存](metadata-target-type-cache-20260907.md)：PR #49 的合同、复现条件与性能证据范围。
 - [Issue #36 研究与首轮基线](gc-issue36-research.md)。
 - [Issue #36 固定工作量复现](gc-issue36-reproduce.md)。
