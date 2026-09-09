@@ -13,7 +13,7 @@ internal sealed record DeckMechanismAxis(string Name, MechanismBalance Balance);
 internal sealed record DeckProfileSnapshot(
     IReadOnlyList<DeckMechanismAxis> Mechanisms, int DeckSize,
     int DrawCards, int EnergyCards, int DefensiveCards, int ExpensiveCards,
-    int ReviewedCards, double IndirectDrawSupply = 0)
+    int ReviewedCards, double IndirectDrawSupply = 0, double? SelectedStartup = null)
 {
     internal bool DrawShortage => DeckSize >= 15 && DrawCards + IndirectDrawSupply < DeckSize * 0.15;
     internal bool EnergyShortage => ExpensiveCards >= 4 && EnergyCards == 0;
@@ -24,6 +24,7 @@ internal static class DeckMechanismProfile
 {
     internal static DeckProfileSnapshot Capture(AdviceContext context)
     {
+        context = context.Prepare();
         DeckMechanismAxis[] axes =
         [
             new("毒的施加与增幅", Capture(context, AdviceRole.PoisonSource, AdviceRole.PoisonPayoff)),
@@ -44,12 +45,13 @@ internal static class DeckMechanismProfile
             context.Deck.Count(c => c.Block > 0),
             context.Deck.Count(c => !c.EnergyX && c.Cost >= 2),
             context.Deck.Count(c => c.Coverage == AdviceCoverage.Partial),
-            context.Deck.Sum(AdviceMechanics.IndirectDrawSupply));
+            context.GetStatistics().IndirectDraw, context.Preference == ArchetypePreference.Automatic ? null
+                : DeckStartupModel.Capture(context, context.Preference).Probability);
     }
 
     internal static MechanismBalance Stars(AdviceContext context) => new(
-        context.StartingStars + context.Deck.Sum(AdviceMechanics.StarSupply),
-        context.Deck.Count(c => c.StarCost > 0 || c.StarsX));
+        context.StartingStars + context.GetStatistics().Stars,
+        context.GetStatistics().StarUsers);
 
     internal static MechanismBalance Forge(AdviceContext context)
     {
@@ -67,5 +69,5 @@ internal static class DeckMechanismProfile
 
     internal static MechanismBalance Capture(AdviceContext context, AdviceRole source, AdviceRole payoff) => new(
         AdviceMechanics.SourceSupply(context, source),
-        context.Deck.Where(c => (c.Roles & payoff) != 0).Sum(c => Math.Clamp(c.PayoffWeight, 0, 4)));
+        context.GetStatistics().Payoffs(payoff));
 }

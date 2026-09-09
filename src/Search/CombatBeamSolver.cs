@@ -108,6 +108,7 @@ internal sealed partial class CombatBeamSolver(
         _enforcePotionDirectives,
         root.HasRenewablePotionShapedRock,
         root.PotionSlotCount > 0 && root.InitialPotionCount >= root.PotionSlotCount,
+        root.PotionOpportunity,
         _theftPolicy,
         _strategicBossHpRelief,
         root.PostCombatRelicHeal,

@@ -37,7 +37,7 @@ internal sealed partial class UnattendedTestRunner
                 || SerializePlan(original) != SerializePlan(copy))
                 throw new InvalidOperationException("路线、预测或选择在写盘恢复后发生变化。");
             byte[] firstBytes = File.ReadAllBytes(cache.Path);
-            cache.StoreFirst(original);
+            cache.StoreBest(original, existing => CombatSearchCoordinator.IsBetterCachedResult(root, policy, original, existing), CancellationToken.None);
             if (!firstBytes.SequenceEqual(File.ReadAllBytes(cache.Path)))
                 throw new InvalidOperationException("后续结果覆盖了首次路线记录。");
             if (SolvedRouteCache.Capture(combat, root,

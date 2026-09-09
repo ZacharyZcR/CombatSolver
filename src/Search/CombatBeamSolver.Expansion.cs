@@ -3698,7 +3698,9 @@ internal sealed partial class CombatBeamSolver
             after.AngerCopiesGenerated,
             optionFamilies,
             pure,
-            normalized);
+            normalized,
+            cardType == CardType.Power || node.Action?.CardId is "BLADE_DANCE" or "CLOAK_AND_DAGGER" or "FAN_OF_KNIVES"
+                ? after.ReadyComboValue - before.ReadyComboValue : 0);
     }
 
     private List<ActionCandidate> SelectActionCandidates(
@@ -3754,6 +3756,13 @@ internal sealed partial class CombatBeamSolver
         if (revivalWindowCandidate is { } revivalCandidate)
             Add(revivalCandidate, allowOverflow: true);
 
+        ActionCandidate? combo = candidates
+            .Where(candidate => CombatComboPolicy.Preserve(candidate.ComboProgress,
+                candidate.Node.Snapshot.ProjectedPlayerHp, parent.Snapshot.ProjectedPlayerHp,
+                candidate.CumulativeHpLost, parent.Snapshot.CumulativePlayerHpLost, limit))
+            .OrderByDescending(candidate => candidate.ComboProgress)
+            .Select(candidate => (ActionCandidate?)candidate).FirstOrDefault();
+
         foreach (ActionOptionFamily family in new[]
                  {
                      ActionOptionFamily.ImmediateDefense,
@@ -3771,6 +3780,8 @@ internal sealed partial class CombatBeamSolver
                 .FirstOrDefault();
             if (representative is { } candidate)
                 Add(candidate);
+            if (family == ActionOptionFamily.ImmediateOffense && combo is { } comboCandidate)
+                Add(comboCandidate);
         }
 
         foreach (IGrouping<uint, ActionCandidate> targetGroup in candidates

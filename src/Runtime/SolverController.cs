@@ -1173,7 +1173,8 @@ internal static class SolverController
                     finalizedResult = search.Interaction.FinalizeWorkerResult(result);
                     token.ThrowIfCancellationRequested();
                     if (!search.Interaction.StopRequested)
-                        routeCache.StoreFirst(finalizedResult);
+                        routeCache.StoreBest(finalizedResult, existing => CombatSearchCoordinator.IsBetterCachedResult(
+                            rootSnapshot, searchPolicy, finalizedResult, existing), token);
                     return finalizedResult;
                 }
                 finally

@@ -310,7 +310,7 @@ internal sealed partial class CombatBeamSolver
         int AngerCopiesGenerated,
         ActionOptionFamily OptionFamilies,
         bool IsPure,
-        double NormalizedValue);
+        double NormalizedValue, int ComboProgress = 0);
 
     [InlineArray(10)]
     private struct HandFingerprintBuffer

@@ -1234,6 +1234,7 @@ internal sealed class SimulationSnapshot(
     private int _releasedAtLine;
 
     public double Score { get; } = score;
+    public int ReadyComboValue { get; init; }
     public StateFingerprint StateKey { get; } = stateKey;
     public StateFingerprint UnorderedPileKey { get; } = unorderedPileKey;
     public StateFingerprint CycleShapeKey { get; } = cycleShapeKey;

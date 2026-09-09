@@ -59,6 +59,7 @@ internal sealed class SolvedRouteCache(string path)
             policy.PotionStrategy.Directives,
             policy.Objective,
             policy.Archetype,
+            root.PotionOpportunity,
             policy.GrowthBudgets,
             policy.HasGrowthTargets,
             policy.IgnoreLongTermRewards,
@@ -80,25 +81,27 @@ internal sealed class SolvedRouteCache(string path)
     {
         if (!File.Exists(Path))
             return null;
-        using FileStream stream = File.OpenRead(Path);
+        using FileStream stream = new(Path, FileMode.Open, System.IO.FileAccess.Read, FileShare.Read | FileShare.Delete);
         SolverResult result = JsonSerializer.Deserialize<SolverResult>(stream, Options(currentForecast))
             ?? throw new InvalidDataException($"Empty solved route: {Path}");
         result.WasRestoredFromCache = true;
         return result;
     }
 
-    public void StoreFirst(SolverResult result)
+    public void StoreBest(SolverResult result, Func<SolverResult, bool> replaces, CancellationToken token)
     {
         if (result.WasRestoredFromCache
             || result.ResultScope == SolverResultScope.CurrentTurnAdoption
-            || File.Exists(Path))
+            || !SolverInterimResultOrdering.IsCompleteVictory(result.BestNode.ActionCount,
+                result.Snapshot.AllEnemiesDead, result.Snapshot.PlayerDead, result.Snapshot.ProjectedPlayerHp))
             return;
         string directory = System.IO.Path.GetDirectoryName(Path)!;
-        Directory.CreateDirectory(directory);
-        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(result, Options(result.Forecast));
-        string temporary = Path + ".tmp";
-        File.WriteAllBytes(temporary, bytes);
-        File.Move(temporary, Path);
+        var options = Options(result.Forecast);
+        bool written = BetterRouteFile.Store(Path,
+            json => replaces(JsonSerializer.Deserialize<SolverResult>(json, options)
+                ?? throw new InvalidDataException($"Empty solved route: {Path}")),
+            () => JsonSerializer.Serialize(result, options), token);
+        if (!written) return;
         foreach (FileInfo obsolete in new DirectoryInfo(directory).GetFiles("*.json")
                      .OrderByDescending(file => file.LastWriteTimeUtc).Skip(MaximumEntries))
             obsolete.Delete();

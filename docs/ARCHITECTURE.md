@@ -329,3 +329,10 @@ renderer 不得重新读取 `SolverResult`、`PlanAction`、`PlanCardChoice` 或
 ### 手动流派偏好
 
 `ArchetypeCatalog` 提供纯值角色选项、已审查角色匹配和有界偏好函数；`ArchetypePreferences` 为按角色持久化的不可变设置。Runtime 的 `ArchetypeSelection` 读取当前单人角色，`SolverController.SetArchetypePreference` 更新设置并取消旧策略的搜索/路线。`SolverArchetypeSelector` 只处理选项显示与回调，奖励/商店在主线程重新捕获评分。`SearchPolicySnapshot.Archetype` 冻结偏好，搜索只在候选同分排序和已有效的持续铺垫估值中使用；它进入持久化路线缓存身份，不进入战斗状态指纹或 ContinuationStamp。
+
+### 牌组评估、组合机会与优胜缓存
+
+- `AdviceDeckStatistics` 独占一批不可变卡牌值快照的统计；`AdviceContext.Prepare` 检查 Deck 引用身份，加/删牌后重新捕获。`DeckQualityEvaluation` 评估整副牌组，`DeckStartupModel` 计算不放回抽样和费用/来源折算；UI 只显示结果。
+- `CombatBeamSolver.ComboPotential.cs` 从当前分支可打出手牌和生效原版 Power 计算短组合机会。`SimulationSnapshot.ReadyComboValue` 是派生评分，不进入状态指纹或 ContinuationStamp。`CombatComboPolicy` 为封闭审查映射与保留条件；Expansion 在既有预算内保护一个合格代表。
+- `PotionOpportunityPolicy` 属于 CombatRootSnapshot 的冻结值，由主线程捕获；Search 的用药容量、反事实和最终筛选共享它，不读取当前设置/牌组。
+- `CachedRouteOrdering` 复用正式主质量比较，Runtime `BetterRouteFile` 负责跨进程互斥与取消安全的原子替换。缓存键包含药水机会及流派政策；普通搜索和回合开始选牌都经过同一写入入口。

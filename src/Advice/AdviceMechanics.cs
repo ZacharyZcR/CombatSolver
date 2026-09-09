@@ -150,7 +150,7 @@ internal static class AdviceMechanics
         * (card.SingleUse ? 0.65 : 1);
 
     internal static double SourceSupply(AdviceContext context, AdviceRole source) =>
-        context.Deck.Where(c => (c.Roles & source) != 0).Sum(SourceWeight)
+        context.GetStatistics().Supply(source)
         + ((source & AdviceRole.SummonSource) != 0 ? Math.Min(2, context.SummonSupply) : 0)
         + ((source & AdviceRole.FocusOrbSource) != 0 ? Math.Min(2, context.InitialFocusOrbs) : 0);
 

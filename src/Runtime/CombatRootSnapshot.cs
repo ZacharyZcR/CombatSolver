@@ -32,6 +32,7 @@ internal sealed class CombatRootSnapshot
     public int InitialPotionCount { get; }
     public int InitialPotionValue { get; }
     public int InitialPlayerHp { get; }
+    public PotionOpportunityPolicy PotionOpportunity { get; private set; }
     public int InitialPlayerMaxHp { get; }
     public int PotionSlotCount { get; }
     public IReadOnlyList<SearchablePotionSlotSnapshot> SearchablePotions { get; }
@@ -237,7 +238,13 @@ internal sealed class CombatRootSnapshot
             simulatedCombat.RootHasBaseLibCardModifiers,
             hasUnusedCardReplayAllocator,
             hasRenewablePotionShapedRock,
-            postCombatRelicHeal);
+            postCombatRelicHeal)
+        {
+            PotionOpportunity = new(player.Creature.CurrentHp, player.Creature.MaxHp,
+                player.Deck.Cards.Any(card => card.Id.Entry == "ALCHEMIZE")
+                    || player.PotionSlots.Any(potion => potion?.Id.Entry == "ENTROPIC_BREW"),
+                state.Encounter?.RoomType == RoomType.Boss),
+        };
     }
 
     /// <summary>

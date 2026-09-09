@@ -52,6 +52,8 @@ internal static class RunAdviceBadge
                     + "\n" + reason;
             if (rating.Parts is { Preference: > 0 } preferenceParts)
                 reason += "\n" + SolverText.Format($"流派倾向 +{preferenceParts.Preference:F1}（已计入配合）");
+            if (rating.Parts is { } deckParts && Math.Abs(deckParts.DeckChange) > 0.01)
+                reason += "\n" + SolverText.Format($"牌组变化 {deckParts.DeckChange:+0.0;-0.0;0.0}（已计入基础）");
             label.TooltipText = title + "\n" + reason + "\n"
                 + string.Join("\n", rating.Reasons.Select(SolverText.Get));
             label.Text = titleOnly ? title : compact ? compactText : title + "\n" + reason;
@@ -94,6 +96,8 @@ internal static class RunAdviceBadge
                 + " " + SolverText.Format($"配合指数 {100 * a.Balance.Readiness:F1}")));
             label.Text += "\n" + (axes.Length == 0 ? SolverText.Get("尚未识别成型配合") : axes)
                 + " · " + SolverText.Format($"抽牌 {profile.DrawCards} / 产能 {profile.EnergyCards} / 格挡 {profile.DefensiveCards}");
+            if (profile.SelectedStartup is { } startup)
+                label.Text += "\n" + SolverText.Format($"所选体系两回合启动估计 {100 * startup:F0}%（非胜率）");
             List<string> shortages = [];
             if (profile.DrawShortage) shortages.Add(SolverText.Get("抽牌组件偏少"));
             if (profile.EnergyShortage) shortages.Add(SolverText.Get("高费牌多，产能组件不足"));

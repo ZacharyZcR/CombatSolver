@@ -1,5 +1,7 @@
 using CombatSolver;
 
+if (args is ["--benchmark"]) { AdviceBenchmark.Run(); return; }
+
 AdviceContext context = new([], new HashSet<string>(), 0, 50, 80, 0, 1);
 int checks = 0;
 void Check(bool condition, string message)
@@ -361,7 +363,7 @@ foreach (bool shop in new[] { false, true })
     double previous = automatic[0].Score + 5d / (1 + 2 * 0.25);
     Check(previous < automatic[1].Score && chosen[0].Rank == 1,
         "Supported core payoff now beats generic area damage that dominated the old manual preference");
-    Check(Math.Abs(chosen[0].Parts!.Preference - (chosen[0].Score - automatic[0].Score)) < 1e-9,
+    Check(Math.Abs(chosen[0].Parts!.Preference + chosen[0].Parts!.DeckChange - automatic[0].Parts!.DeckChange - (chosen[0].Score - automatic[0].Score)) < 1e-9,
         "UI preference contribution equals the actual selected-archetype score change");
     Check(Math.Abs(chosen[0].Parts!.Base + chosen[0].Parts!.Synergy + chosen[0].Parts!.Price - chosen[0].Score) < 1e-9,
         "Displayed preference is a subset of synergy and must not be counted twice");
@@ -379,4 +381,56 @@ Check(ArchetypeCatalog.AdviceBonus(weightedContext with { Deck = [weightedSource
     < ArchetypeCatalog.AdviceBonus(weightedContext, weightedPayoff), "Repeated payoff copies diminish");
 Check(ArchetypeCatalog.AdviceBonus(weightedContext, weightedSource with { Availability = 0 }) == 0,
     "An unavailable source is not rewarded as a core component");
+Check(Math.Abs(DeckStartupModel.Together(20, 1, 1, 0, 5) - 5d * 4 / (20 * 19)) < 1e-12,
+    "Without-replacement source/payoff probability matches exact combinatorics");
+Check(Math.Abs(DeckStartupModel.Together(20, 1, 1, 1, 5) - 0.25) < 1e-12,
+    "A dual-role card is not required to be drawn twice");
+for (int n = 1; n <= 6; n++)
+for (int sourceCount = 0; sourceCount <= n; sourceCount++)
+for (int payoffCount = 0; payoffCount <= n; payoffCount++)
+for (int overlapCount = Math.Max(0, sourceCount + payoffCount - n); overlapCount <= Math.Min(sourceCount, payoffCount); overlapCount++)
+for (int draws = 0; draws <= n; draws++)
+{
+    int total = 0, hit = 0;
+    for (int hand = 0; hand < (1 << n); hand++)
+    {
+        if (System.Numerics.BitOperations.PopCount((uint)hand) != draws) continue;
+        total++;
+        int sourceMask = (1 << sourceCount) - 1;
+        int payoffMask = ((1 << overlapCount) - 1) | (((1 << (payoffCount - overlapCount)) - 1) << sourceCount);
+        if ((hand & sourceMask) != 0 && (hand & payoffMask) != 0) hit++;
+    }
+    Check(Math.Abs(DeckStartupModel.Together(n, sourceCount, payoffCount, overlapCount, draws) - hit / (double)total) < 1e-12,
+        "Startup draw probability matches enumerated hands");
+}
+var startupContext = weightedContext with { Deck = [weightedSource, weightedPayoff, weightedStrike, weightedDefend] };
+var startup = DeckStartupModel.Capture(startupContext, ArchetypePreference.Shiv);
+Check(startup.Probability > 0 && startup.Probability <= 1, "Supported engine has bounded setup estimate");
+Check(DeckStartupModel.Capture(startupContext with { Deck = [weightedPayoff, weightedStrike] }, ArchetypePreference.Shiv).Probability == 0,
+    "Payoff alone cannot start its engine");
+Check(DeckStartupModel.Capture(startupContext with { BaseEnergy = 1 }, ArchetypePreference.Shiv).Probability < startup.Probability,
+    "Energy shortage lowers setup reliability");
+Check(DeckStartupModel.Capture(startupContext with { Deck = startupContext.Deck.Concat(Enumerable.Repeat(weightedStrike, 20)).ToArray() }, ArchetypePreference.Shiv).Probability < startup.Probability,
+    "Deck dilution lowers setup reliability");
+var strongDeck = context with { Deck = Enumerable.Repeat(weightedAttack with { Damage = 30 }, 6)
+    .Concat(Enumerable.Repeat(weightedDefend with { Block = 15 }, 4)).ToArray() };
+var weakAddition = weightedStrike with { Id = "WEAK_REFERENCE", Basic = false, Damage = 4, Cost = 2 };
+var qualityBefore = DeckQualityEvaluation.Capture(strongDeck);
+Check(DeckQualityEvaluation.Addition(strongDeck, weakAddition, qualityBefore) < 0,
+    "Diluting a strong deck with an inefficient card reduces whole-deck quality");
+Check(RunAdvice.Rank(strongDeck, [new("weak", AdviceKind.Card, weakAddition.Id, Card: weakAddition), new("skip", AdviceKind.Skip, "skip")], false)[1].Rank == 1,
+    "Skip beats an inefficient addition to a functioning deck");
+var prepared = startupContext.Prepare();
+Check(ReferenceEquals(prepared.GetStatistics(), prepared.Prepare().GetStatistics()), "Batch reuses the exact statistics object");
+var changed = prepared with { Deck = [weightedPayoff] };
+Check(changed.GetStatistics().Copies(weightedSource.Id) == 0, "Deck replacement invalidates statistics identity");
+foreach (AdviceRole mask in new[] { AdviceRole.ShivSource, AdviceRole.ShivPayoff, AdviceRole.ExhaustSource | AdviceRole.SelfExhaust })
+    Check(Math.Abs(prepared.GetStatistics().Supply(mask) - prepared.Deck.Where(c => (c.Roles & mask) != 0).Sum(AdviceMechanics.SourceWeight)) < 1e-12,
+        "Cached role-union statistics equal direct evaluation without double counting");
+var starBlocked = context with { Deck = [weightedAttack with { StarCost = 10, Damage = 100 }] };
+Check(DeckQualityEvaluation.Capture(starBlocked).Output == 0,
+    "Whole-deck output cannot spend stars that have no source");
+var ostyBlocked = context with { Deck = [weightedAttack with { Roles = AdviceRole.OstyAttack, Damage = 100 }] };
+Check(DeckQualityEvaluation.Capture(ostyBlocked).Output == 0,
+    "Whole-deck output cannot count an unsupported summon attack");
 Console.WriteLine($"RUN_ADVICE_CHECKS_OK checks={checks}");

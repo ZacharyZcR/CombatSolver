@@ -469,6 +469,7 @@ done
 expected_beam_files=(
     CombatBeamSolver.cs
     CombatBeamSolver.BeamRetentionPolicy.cs
+    CombatBeamSolver.ComboPotential.cs
     CombatBeamSolver.CrossTurnPlanning.cs
     CombatBeamSolver.CyclePlanning.cs
     CombatBeamSolver.CycleRegionRetention.cs

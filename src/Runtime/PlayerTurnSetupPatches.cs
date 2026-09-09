@@ -1222,7 +1222,8 @@ internal static class PlayerTurnSetupCoordinator
                     SolverResult finalized = active.Interaction.FinalizeWorkerResult(result);
                     active.Token.ThrowIfCancellationRequested();
                     if (!active.Interaction.StopRequested)
-                        initialSearch.RouteCache.StoreFirst(finalized);
+                        initialSearch.RouteCache.StoreBest(finalized, existing => CombatSearchCoordinator.IsBetterCachedResult(
+                            initialSearch.RootSnapshot, initialSearch.SearchPolicy, finalized, existing), active.Token);
                     return finalized;
                 }
                 finally

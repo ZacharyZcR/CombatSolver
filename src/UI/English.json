@@ -465,5 +465,8 @@
   "符合所选流派，但缺少前置或已有重复组件": "Matches your archetype, but lacks support or duplicates existing components",
   "优先补充所选流派的核心与缺口": "Prioritizes core components and gaps in your selected archetype",
   "流派倾向 +{0:F1}（已计入配合）": "Archetype +{0:F1} (included in synergy)",
-  "所选流派优先补齐奖励与商店的核心组件，缺少前置和重复组件降权；战斗保留温和倾向、生存优先和收益限制。自动识别保留多体系评分。仅列出已建模机制。": "Prioritizes core components in rewards and shops. Unsupported payoffs and duplicates get smaller bonuses. Combat keeps a mild preference, survival priorities and reward limits. Automatic retains multi-mechanism scoring. Only modeled mechanisms are listed."
+  "所选流派优先补齐奖励与商店的核心组件，缺少前置和重复组件降权；战斗保留温和倾向、生存优先和收益限制。自动识别保留多体系评分。仅列出已建模机制。": "Prioritizes core components in rewards and shops. Unsupported payoffs and duplicates get smaller bonuses. Combat keeps a mild preference, survival priorities and reward limits. Automatic retains multi-mechanism scoring. Only modeled mechanisms are listed.",
+  "已比较加入前后的整副牌组效率与启动估计": "Includes the change in whole-deck efficiency and estimated setup reliability",
+  "牌组变化 {0:+0.0;-0.0;0.0}（已计入基础）": "Deck change {0:+0.0;-0.0;0.0} (included in base)",
+  "所选体系两回合启动估计 {0:F0}%（非胜率）": "Estimated selected-engine setup within two turns: {0:F0}% (not win rate)"
 }

@@ -9,7 +9,7 @@ internal enum AdviceTag
 
 internal enum AdviceCoverage { Unreviewed, Partial }
 
-internal sealed record AdviceScoreParts(double Base, double Synergy, double Price, double Preference = 0);
+internal sealed record AdviceScoreParts(double Base, double Synergy, double Price, double Preference = 0, double DeckChange = 0);
 
 internal enum AdviceKind { Card, Relic, Potion, Removal, Skip }
 
@@ -23,7 +23,14 @@ internal sealed record AdviceCard(
 internal sealed record AdviceContext(
     IReadOnlyList<AdviceCard> Deck, IReadOnlySet<string> Relics,
     int Gold, int Hp, int MaxHp, int Act, int EmptyPotionSlots,
-    double StartingStars = 0, double SummonSupply = 0, double InitialFocusOrbs = 0, int BaseEnergy = 3, ArchetypePreference Preference = ArchetypePreference.Automatic);
+    double StartingStars = 0, double SummonSupply = 0, double InitialFocusOrbs = 0, int BaseEnergy = 3, ArchetypePreference Preference = ArchetypePreference.Automatic)
+{
+    internal AdviceDeckStatistics? Statistics { get; init; }
+    internal AdviceDeckStatistics GetStatistics() => Statistics is { } stats && ReferenceEquals(stats.Deck, Deck)
+        ? stats : new(Deck);
+    internal AdviceContext Prepare() => Statistics is { } stats && ReferenceEquals(stats.Deck, Deck)
+        ? this : this with { Statistics = new(Deck) };
+}
 
 internal sealed record AdviceOffer(
     string Key, AdviceKind Kind, string Id, int Cost = 0,
@@ -38,7 +45,10 @@ internal static class RunAdvice
 {
     internal static AdviceRating[] Rank(AdviceContext context, IReadOnlyList<AdviceOffer> offers, bool shop)
     {
-        AdviceRating[] results = offers.Select(offer => Rate(context, offer, shop)).ToArray();
+        context = context.Prepare();
+        var quality = offers.Any(o => o.Kind == AdviceKind.Card || o.Kind == AdviceKind.Removal)
+            ? DeckQualityEvaluation.Capture(context) : default;
+        AdviceRating[] results = offers.Select(offer => Rate(context, offer, shop, quality)).ToArray();
         var ordered = results.Where(r => r.Available && (r.Known || r.Offer.FallbackValue.HasValue))
             .OrderByDescending(r => r.Score).ToArray();
         for (int i = 0; i < results.Length; i++)
@@ -51,7 +61,7 @@ internal static class RunAdvice
         return results;
     }
 
-    private static AdviceRating Rate(AdviceContext context, AdviceOffer offer, bool shop)
+    private static AdviceRating Rate(AdviceContext context, AdviceOffer offer, bool shop, DeckQualityEvaluation quality)
     {
         List<string> reasons = [];
         bool known = true;
@@ -60,11 +70,18 @@ internal static class RunAdvice
         double value;
         double synergy = 0;
         double preference = 0;
+        double deckChange = 0;
         switch (offer.Kind)
         {
             case AdviceKind.Card:
                 known = offer.Card?.Known == true;
                 value = offer.Card is { } card ? CardValue(context, card, reasons, out synergy, out preference) : 0;
+                if (offer.Card is { Known: true } added)
+                {
+                    deckChange = DeckQualityEvaluation.Addition(context, added, quality);
+                    value += deckChange;
+                    reasons.Add("已比较加入前后的整副牌组效率与启动估计");
+                }
                 break;
             case AdviceKind.Relic:
                 (value, known) = RelicValue(context, offer.Id, reasons);
@@ -75,7 +92,7 @@ internal static class RunAdvice
             case AdviceKind.Removal:
                 var removable = context.Deck.Select((c, index) => (Card: c, Index: index))
                     .Where(c => c.Card.Removable)
-                    .Select(c => (c.Card, c.Index, Value: RemovalValue(context, c.Index)))
+                    .Select(c => (c.Card, c.Index, Value: RemovalValue(context, c.Index, quality)))
                     .OrderByDescending(c => c.Value).FirstOrDefault();
                 value = removable.Card is null ? -100 : removable.Value;
                 removalId = removable.Card?.Id;
@@ -110,7 +127,7 @@ internal static class RunAdvice
         }
         if (!known) reasons.Add("效果规则未覆盖");
         return new AdviceRating(offer, value, 0, available, known, reasons, removalId, removalIndex,
-            new AdviceScoreParts(beforePrice - synergy, synergy, value - beforePrice, preference));
+            new AdviceScoreParts(beforePrice - synergy, synergy, value - beforePrice, preference, deckChange));
     }
 
     internal static double CardValue(AdviceContext context, AdviceCard card, List<string> reasons)
@@ -118,12 +135,14 @@ internal static class RunAdvice
 
     private static double CardValue(AdviceContext context, AdviceCard card, List<string> reasons, out double synergy, out double preference)
     {
+        context = context.Prepare();
+        var stats = context.GetStatistics();
         synergy = 0;
         preference = 0;
         if (card.Curse) { reasons.Add("增加牌组负担"); return -25; }
         int size = Math.Max(1, context.Deck.Count);
-        double attacks = context.Deck.Count(c => c.Attack || c.Damage > 0) / (double)size;
-        double blocks = context.Deck.Count(c => c.Block > 0) / (double)size;
+        double attacks = stats.DamageCards / (double)size;
+        double blocks = stats.Blocks / (double)size;
         double damage = card.Roles.HasFlag(AdviceRole.OstyAttack)
             && AdviceMechanics.SourceSupply(context, AdviceRole.SummonSource) == 0 ? 0 : card.Damage;
         double face = Math.Max(0, damage * 0.8 + card.Block * 0.7);
@@ -133,30 +152,30 @@ internal static class RunAdvice
         if (card.Tags.HasFlag(AdviceTag.Draw))
         {
             value += (5 + Math.Min(5, card.Draw * 2)) * DeckMechanismProfile.DrawDemand(
-                size, context.Deck.Sum(AdviceMechanics.DrawSupply));
+                size, stats.Draw);
             reasons.Add("改善抽牌");
         }
         double indirectDraw = AdviceMechanics.IndirectDrawSupply(card);
         if (indirectDraw > 0)
         {
             value += Math.Min(8, 4 * indirectDraw) * DeckMechanismProfile.DrawDemand(
-                size, context.Deck.Sum(AdviceMechanics.DrawSupply));
+                size, stats.Draw);
             reasons.Add("生成灵魂提供后续抽牌，已折算延迟与一次性供给");
         }
         if (card.Tags.HasFlag(AdviceTag.Energy))
         {
-            value += DeckMechanismProfile.EnergyDemand(context.Deck.Count(c => !c.EnergyX && c.Cost >= 2),
-                context.Deck.Count(c => c.Tags.HasFlag(AdviceTag.Energy)));
+            value += DeckMechanismProfile.EnergyDemand(stats.Expensive,
+                stats.Tagged(AdviceTag.Energy));
             reasons.Add("补充能量");
         }
         if (card.Tags.HasFlag(AdviceTag.Area))
         {
-            value += context.Deck.Any(c => c.Tags.HasFlag(AdviceTag.Area)) ? 3 : 10;
+            value += (stats.Tagged(AdviceTag.Area) > 0) ? 3 : 10;
             reasons.Add("补充群体伤害");
         }
         if (card.Tags.HasFlag(AdviceTag.Scaling))
         {
-            value += context.Deck.Count(c => c.Tags.HasFlag(AdviceTag.Scaling)) < 2 ? (context.Act == 0 ? 10 : 12) : 3;
+            value += stats.Tagged(AdviceTag.Scaling) < 2 ? (context.Act == 0 ? 10 : 12) : 3;
             reasons.Add("提供持续效果");
         }
         AdviceTag[] archetypes = [AdviceTag.Poison, AdviceTag.Doom, AdviceTag.Shiv];
@@ -169,7 +188,7 @@ internal static class RunAdvice
                 continue;
             if (tag == AdviceTag.Shiv && (card.Roles & (AdviceRole.ShivSource | AdviceRole.ShivPayoff)) != 0)
                 continue;
-            int support = context.Deck.Count(c => c.Tags.HasFlag(tag));
+            int support = stats.Tagged(tag);
             if (support >= 2) synergy = Math.Max(synergy, Math.Min(7, support * 1.5));
         }
         if (synergy > 0) reasons.Add("契合现有体系");
@@ -183,9 +202,9 @@ internal static class RunAdvice
         { synergy += 4; reasons.Add("配合连续攻击遗物"); }
         if (context.Relics.Contains("SNECKO_EYE") && !card.EnergyX && card.Cost >= 2)
         { synergy += 5; reasons.Add("配合费用随机遗物"); }
-        else if (!card.EnergyX && card.Cost >= 2 && !context.Deck.Any(c => c.Tags.HasFlag(AdviceTag.Energy)))
+        else if (!card.EnergyX && card.Cost >= 2 && !(stats.Tagged(AdviceTag.Energy) > 0))
         { value -= 3 * (card.Cost - 1); reasons.Add("费用偏高"); }
-        int copies = context.Deck.Count(c => c.Id == card.Id);
+        int copies = stats.Copies(card.Id);
         if (copies > 0 && card.Id != "CLAW") { value -= copies * 3; reasons.Add("已有同名牌"); }
         if (copies > 0 && card.Id == "CLAW") { synergy += Math.Min(6, copies * 2); reasons.Add("同名爪击共享本战成长"); }
         if (card.Basic) { value -= 7; reasons.Add("基础牌收益有限"); }
@@ -196,6 +215,9 @@ internal static class RunAdvice
     }
 
     internal static double RemovalValue(AdviceContext context, int index)
+        => RemovalValue(context.Prepare(), index, DeckQualityEvaluation.Capture(context));
+
+    private static double RemovalValue(AdviceContext context, int index, DeckQualityEvaluation quality)
     {
         AdviceCard card = context.Deck[index];
         AdviceContext remaining = context with
@@ -214,25 +236,8 @@ internal static class RunAdvice
         }
         else
             value = Math.Max(-8, -CardValue(remaining, card, []) * 0.5);
-        // Compare each surviving component with itself excluded on both sides.
-        // This accounts for breaking the last source, rather than treating removal
-        // as merely the opposite of buying one more copy.
-        double synergyChange = 0;
-        for (int i = 0; i < context.Deck.Count; i++)
-        {
-            if (i == index) continue;
-            AdviceCard survivor = context.Deck[i];
-            AdviceContext before = context with
-            {
-                Deck = context.Deck.Where((_, j) => j != i).ToArray(),
-            };
-            AdviceContext after = context with
-            {
-                Deck = context.Deck.Where((_, j) => j != i && j != index).ToArray(),
-            };
-            synergyChange += CardValue(after, survivor, [])
-                - CardValue(before, survivor, []);
-        }
+        // Evaluate the resulting deck once instead of rescoring every survivor as a new purchase.
+        double synergyChange = 2 * (DeckQualityEvaluation.Capture(remaining).Total - quality.Total);
         foreach (string relic in context.Relics)
         {
             var before = RelicValue(context, relic, []);

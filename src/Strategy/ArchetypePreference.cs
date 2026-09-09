@@ -76,7 +76,7 @@ internal static class ArchetypeCatalog
         && !card.Basic && ((Roles(preference) & card.Roles) != 0
             || preference == ArchetypePreference.Stars && (card.Stars > 0 || card.StarCost > 0 || card.StarsX));
 
-    private static AdviceRole Sources(ArchetypePreference preference) => preference switch
+    internal static AdviceRole Sources(ArchetypePreference preference) => preference switch
     {
         ArchetypePreference.Strength => AdviceRole.StrengthSource,
         ArchetypePreference.Exhaust => AdviceRole.ExhaustSource | AdviceRole.SelfExhaust,
@@ -104,7 +104,7 @@ internal static class ArchetypeCatalog
         double payoff = stars ? card.StarCost > 0 || card.StarsX ? 1 : 0
             : (card.Roles & payoffs) != 0 ? Math.Clamp(card.PayoffWeight, 0, 4) : 0;
         if (supply + payoff <= 0) return 0;
-        int copies = context.Deck.Count(c => c.Id == card.Id);
+        int copies = context.GetStatistics().Copies(card.Id);
         double duplicateFactor = 1 + copies * 0.7;
         // Choosing a direction is not evidence that an unsupported payoff already works.
         if (supply == 0 && current.Supply <= 0) return 2 / duplicateFactor;

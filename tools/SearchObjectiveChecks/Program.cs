@@ -1,4 +1,10 @@
 using CombatSolver;
+if (args is ["--cache-write", var targetPath, var scoreText])
+{
+    int candidateScore = int.Parse(scoreText);
+    BetterRouteFile.Store(targetPath, old => candidateScore < int.Parse(old), () => scoreText, CancellationToken.None);
+    return;
+}
 int checks = 0;
 void Check(bool ok, string message) { if (!ok) throw new InvalidOperationException(message); checks++; }
 SearchObjectiveOutcome Outcome(SearchObjective mode, int hp, int growth, int loss = 0) => new(
@@ -57,4 +63,51 @@ foreach(var mode in new[]{SearchObjective.PermanentGrowth,SearchObjective.NetRes
     Check(extra.TargetValue==reached.TargetValue, "Rewards above target must not improve objective priority");
 }
 Check(!Outcome(SearchObjective.Balanced,50,100).CanStopSearch(true), "Balanced retains its stopping rules");
+var cached = new SolverInterimResult(true, 0, 4, 4, 9, 1, 0, 100, 2)
+    { Objective = Outcome(SearchObjective.Balanced, 46, 0) };
+Check(CachedRouteOrdering.IsBetter(cached with { StrategicHpDeficit = 3 }, cached, false), "Strictly better health replaces cache");
+Check(!CachedRouteOrdering.IsBetter(cached with { StrategicHpDeficit = 5, Score = 10000 }, cached, false), "Heuristic score cannot overwrite better HP");
+Check(!CachedRouteOrdering.IsBetter(cached with { Score = 10000 }, cached, false), "Equivalent outcomes do not churn cache");
+Check(!CachedRouteOrdering.IsBetter(cached with { Won = false, StrategicHpDeficit = 0 }, cached, false), "Incomplete plans cannot replace complete plans");
+Check(CachedRouteOrdering.IsBetter(cached with { PotionStrategicCost = 3 }, cached, false), "Potion value is part of cache quality");
+Check(!CachedRouteOrdering.IsBetter(cached with { OutstandingStolenResource = 1, PotionStrategicCost = 0 }, cached, true), "Theft policy survives replacement");
+Check(!CachedRouteOrdering.IsBetter(cached with { Objective = Outcome(SearchObjective.PermanentGrowth, 50, 3) }, cached, false), "Different objectives never share replacement ordering");
+var growthCached = cached with { Objective = Outcome(SearchObjective.PermanentGrowth, 40, 1) };
+Check(!CachedRouteOrdering.IsBetter(growthCached with { Objective = Outcome(SearchObjective.PermanentGrowth, 29, 100) }, growthCached, false), "Unsafe growth cannot overwrite safe cache");
+foreach (var (power, card, exhaust) in new[] { ("AccuracyPower", "BLADE_DANCE", false),
+    ("AccuracyPower", "SHIV", true), ("StrengthPower", "TWIN_STRIKE", false),
+    ("DarkEmbracePower", "SHIV", true), ("FocusPower", "GLACIER", false), ("HauntPower", "SOUL", true) })
+    Check(CombatComboPolicy.Connects(power, card, exhaust), "Reviewed setup connects to its follow-up");
+Check(!CombatComboPolicy.Connects("AccuracyPower", "STRIKE", false), "Unrelated cards are not combo continuations");
+Check(CombatComboPolicy.Preserve(2, 50, 50, 0, 0, 3), "Safe ready combo can receive a slot");
+Check(!CombatComboPolicy.Preserve(2, 49, 50, 1, 0, 3)
+    && !CombatComboPolicy.Preserve(0, 50, 50, 0, 0, 3)
+    && !CombatComboPolicy.Preserve(2, 50, 50, 0, 0, 2), "No extra HP loss, no empty combo, no defense starvation");
+string cacheDirectory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "combat-solver-cache-check-" + Guid.NewGuid().ToString("N"));
+string cachePath = System.IO.Path.Combine(cacheDirectory, "route.json");
+try
+{
+    Check(BetterRouteFile.Store(cachePath, _ => false, () => "5", CancellationToken.None), "Initial cache write");
+    Check(!BetterRouteFile.Store(cachePath, old => int.Parse(old) > 6, () => throw new Exception("Must not serialize worse route"), CancellationToken.None), "Inferior cache write is skipped");
+    Check(BetterRouteFile.Store(cachePath, old => int.Parse(old) > 3, () => "3", CancellationToken.None), "Superior route replaces file");
+    Check(File.ReadAllText(cachePath) == "3", "Fresh file read observes replacement");
+    using var cancel = new CancellationTokenSource();
+    try { BetterRouteFile.Store(cachePath, _ => true, () => { cancel.Cancel(); return "1"; }, cancel.Token); Check(false, "Cancellation expected"); }
+    catch (OperationCanceledException) { Check(File.ReadAllText(cachePath) == "3", "Cancellation preserves old file"); }
+    Parallel.For(1, 9, candidate => BetterRouteFile.Store(cachePath, old => candidate < int.Parse(old), () => candidate.ToString(), CancellationToken.None));
+    Check(File.ReadAllText(cachePath) == "1", "Concurrent writers retain the best route");
+    var children = new[] { "0", "-1" }.Select(score =>
+    {
+        var start = new System.Diagnostics.ProcessStartInfo(Environment.ProcessPath!) { UseShellExecute = false };
+        start.ArgumentList.Add("--cache-write"); start.ArgumentList.Add(cachePath); start.ArgumentList.Add(score);
+        return System.Diagnostics.Process.Start(start)!;
+    }).ToArray();
+    foreach (var child in children)
+    {
+        using (child) Check(child.WaitForExit(5000) && child.ExitCode == 0, "Independent process finishes cache update");
+    }
+    Check(File.ReadAllText(cachePath) == "-1", "Independent processes retain the best route");
+    Check(Directory.GetFiles(cacheDirectory, "*.tmp").Length == 0, "Temporary files cleaned");
+}
+finally { if (Directory.Exists(cacheDirectory)) Directory.Delete(cacheDirectory, true); }
 Console.WriteLine($"SEARCH_OBJECTIVE_CHECKS_OK checks={checks}");

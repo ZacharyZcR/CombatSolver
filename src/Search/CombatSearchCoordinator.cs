@@ -1556,6 +1556,11 @@ internal static partial class CombatSearchCoordinator
         };
 
 
+    internal static bool IsBetterCachedResult(CombatRootSnapshot root, SearchPolicySnapshot policy,
+        SolverResult candidate, SolverResult current)
+        => CachedRouteOrdering.IsBetter(BuildInterimResult(root, policy, candidate),
+            BuildInterimResult(root, policy, current), policy.TheftPolicy == SolverTheftPolicy.PreserveResources);
+
     private static bool IsBetterCompletedResult(
         CombatRootSnapshot root,
         SearchPolicySnapshot policy,
@@ -1728,7 +1733,7 @@ internal static partial class CombatSearchCoordinator
                 == SolverWeights.PotionMinimumHpSaved);
         strategicHpCost = PotionInventoryValue.RequiredCost(strategicHpCost,
             root.PotionSlotCount > 0 && root.InitialPotionCount >= root.PotionSlotCount,
-            ordinaryUsed, SolverWeights.PotionMinimumHpSaved);
+            ordinaryUsed, SolverWeights.PotionMinimumHpSaved, root.PotionOpportunity);
         return PotionUsePolicy.SmartRequiredHpSaved(
             strategicHpCost,
             StrategicBossHpRelief(root, policy));
@@ -1801,7 +1806,7 @@ internal static partial class CombatSearchCoordinator
         int firstCost = PotionUsePolicy.SmartRequiredHpSaved(
             PotionInventoryValue.RequiredCost(SolverWeights.PotionMinimumHpSaved,
                 root.PotionSlotCount > 0 && root.InitialPotionCount >= root.PotionSlotCount,
-                ordinaryAvailable, SolverWeights.PotionMinimumHpSaved), StrategicBossHpRelief(root, policy));
+                ordinaryAvailable, SolverWeights.PotionMinimumHpSaved, root.PotionOpportunity), StrategicBossHpRelief(root, policy));
         int paidPotionCapacity = PotionInventoryValue.PaidCapacity(
             potionFreeHpDeficit, paidPotionHpRequired, firstCost);
         return Math.Min(

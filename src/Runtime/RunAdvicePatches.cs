@@ -33,6 +33,7 @@ internal static class RunAdvicePresentation
                 ? [new AdviceOffer("skip", AdviceKind.Skip, "skip")] : Array.Empty<AdviceOffer>()).ToArray();
         AdviceContext context = RunAdviceCapture.Capture(player) with
         { Preference = SolverSettings.Current.Archetypes.For(player.Character.Id.Entry) };
+        context = context.Prepare();
         AdviceRating[] ratings = RunAdvice.Rank(context, offers, false);
         ShowArchetypeSelector(screen, player, () => Reward(screen, options, alternatives));
         var holders = screen.GetNode<Control>("UI/CardRow").GetChildren()
@@ -86,6 +87,7 @@ internal static class RunAdvicePresentation
             .Append(new AdviceOffer("save", AdviceKind.Skip, "save")).ToArray();
         AdviceContext context = RunAdviceCapture.Capture(player) with
         { Preference = SolverSettings.Current.Archetypes.For(player.Character.Id.Entry) };
+        context = context.Prepare();
         AdviceRating[] ratings = RunAdvice.Rank(context, offers, true);
         ShowArchetypeSelector(shop, player, () => Shop(shop));
         for (int i = 0; i < slots.Length; i++)

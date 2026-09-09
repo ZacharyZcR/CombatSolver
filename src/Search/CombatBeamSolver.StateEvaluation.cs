@@ -409,6 +409,8 @@ internal sealed partial class CombatBeamSolver
         score += (long)Math.Max(0, vulnerable - focusTargetVulnerableTurns)
             * vulnerableAttackWindow
             * SolverWeights.OffTargetVulnerableAttackMultiplierBeamValue;
+        int readyComboValue = dead || won ? 0 : ComboPotential(simulator);
+        score += readyComboValue;
         score += actionCount * SolverWeights.ActionPenalty;
         if (risk)
             score += SolverWeights.RiskPenalty;
@@ -505,6 +507,7 @@ internal sealed partial class CombatBeamSolver
             simulator,
             simulator.TerminalStamp)
         {
+            ReadyComboValue = readyComboValue,
             Objective = objective,
             GrowthHpCredit = growthHpCredit,
             GrowthRewards = growthRewards,

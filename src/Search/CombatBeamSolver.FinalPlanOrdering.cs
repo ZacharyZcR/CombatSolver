@@ -8,6 +8,7 @@ internal sealed partial class CombatBeamSolver
         bool enforcePotionDirectives,
         bool renewablePotionShapedRock,
         bool potionInventoryFull,
+        PotionOpportunityPolicy potionOpportunity,
         SolverTheftPolicy? theftPolicy,
         BossHpRelief bossHpRelief,
         PostCombatRelicHealProfile postCombatRelicHeal,
@@ -69,7 +70,7 @@ internal sealed partial class CombatBeamSolver
                     if (potionPolicy == SolverPotionPolicy.Smart)
                         optionalPotionStrategicCost = PotionInventoryValue.RequiredCost(
                             optionalPotionStrategicCost, potionInventoryFull, ordinaryOptionalPotion,
-                            SolverWeights.PotionMinimumHpSaved);
+                            SolverWeights.PotionMinimumHpSaved, potionOpportunity);
                     int optionalAmbergrisCount = Math.Max(0, ambergrisCount - forced.ForcedAmbergrisCount);
                     SolverPotionPolicy effectivePotionPolicy = potionPolicy switch
                     {

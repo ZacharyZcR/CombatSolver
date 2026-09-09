@@ -108,3 +108,5 @@ StrategicEffectMirrors.Register<MyPower>(
 `StrategicEffectContext.Build` accepts optional `skillsExhaust` (default false). The solver supplies it from owned active Corruption; it changes exhaust fuel and generator lifetime without modifying card keywords.
 
 手动流派偏好是单独的搜索政策，不改变登记的 StrategicEffectVector。当前角色选项及匹配名单在 `ArchetypeCatalog` 中封闭维护；未知角色只显示 Automatic，未知 Power 不获得偏好加分。对原版已审查 Power 的手动偏好只在求解器聚合持续效果时施加有界保路加权，不修改终局实际收益或模拟结算。
+
+组合保留的封闭入口为 `CombatComboPolicy.Connects`；只读取已审查原版卡牌和 Power 的当前合法衔接，第三方同名类型/ID 不进入该映射。ReadyComboValue 不改变已登记 StrategicEffectVector 或模拟结算；它只影响中间保留，不是新登记点。
