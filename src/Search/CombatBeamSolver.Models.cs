@@ -135,6 +135,7 @@ internal sealed partial class CombatBeamSolver
         public readonly OwnedExpansionBatch<SimulationSnapshot, RawCardCandidate, SearchNode>.Pool
             ExpansionBatchPool = new(static snapshot => snapshot.ReleaseSimulator());
         public readonly SnapshotListBuffer<PredictedCard> SnapshotLiveCards = new();
+        public readonly ProjectedShuffleCache ProjectedShuffles = new();
         public Dictionary<StateFingerprint, TranspositionFrontier> Transpositions = [];
         public Dictionary<StateFingerprint, TranspositionFrontier> ExpandedTranspositions = [];
         public Dictionary<StateFingerprint, StandPatEvaluation> StandPatCache = [];
@@ -251,6 +252,7 @@ internal sealed partial class CombatBeamSolver
         {
             ExpansionBatchPool.Clear();
             SnapshotLiveCards.Clear();
+            ProjectedShuffles.Clear();
             Transpositions = [];
             foreach (SearchNode node in frontier)
             {
@@ -273,6 +275,7 @@ internal sealed partial class CombatBeamSolver
         {
             ExpansionBatchPool.Clear();
             SnapshotLiveCards.Clear();
+            ProjectedShuffles.Clear();
             StandPatCache = [];
             ThreatProjectionCache = [];
             CoverageCache = [];

@@ -760,8 +760,8 @@ internal sealed partial class CombatBeamSolver
         // StableShuffle sorts a second List copy before shuffling. This list is already private
         // to the snapshot, so performing the same sort and shuffle in place avoids
         // another deck-sized backing array without changing RNG consumption or ordering.
-        var shuffleRng = simulator.Rng.Shuffle.Clone();
-        StableShuffleProjection(cards, shuffleRng);
+        cards.Sort();
+        _run.ProjectedShuffles.Shuffle(cards, simulator.Rng.Shuffle);
 
         StateFingerprintBuilder key = new();
         key.Add(simulator.Rng.Shuffle.Counter());
