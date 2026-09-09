@@ -387,5 +387,8 @@
   "预计收益：金币 {0:+0;-0;0} · 待结算 {1} · 选牌 {2} 次 · 药水 {3:+0;-0;0} 瓶": "Projected gains: gold {0:+0;-0;0} \u00b7 pending {1} \u00b7 card rewards {2} \u00b7 potions {3:+0;-0;0}",
   "净收益构成：金币 {0:+0;-0;0} + 待结算 {1} + 选牌奖励分 {2} + 药水价值变化 {3:+0;-0;0} − 保命遗物消耗 {4} = {5} 分": "Net score: gold {0:+0;-0;0} + pending {1} + card reward value {2} + potion value change {3:+0;-0;0} \u2212 death-save relic cost {4} = {5}",
   "预计结束血量 {0} HP · 本场累计战损 {1} HP": "Projected ending HP {0} \u00b7 total battle HP loss {1}",
-  "以上为本次搜索路线的预测增量，不是已经到账的收益；重新搜索时重新计量。": "These are projected gains for this search route, not resources already received. A new search resets the measurement."
+  "以上为本次搜索路线的预测增量，不是已经到账的收益；重新搜索时重新计量。": "These are projected gains for this search route, not resources already received. A new search resets the measurement.",
+  "培养目标（点，0 默认 3）": "Growth target (0 = 3 points)",
+  "净收益目标（分，0 默认 25）": "Net resource target (0 = 25)",
+  "目标进度：{0} / {1}；达标且完整获胜、满足血量限制后停止继续搜索。本次重新搜索重新计量。": "Target progress: {0} / {1}. Search stops after reaching the target with a complete victory within HP limits. A new search resets the measurement."
 }
