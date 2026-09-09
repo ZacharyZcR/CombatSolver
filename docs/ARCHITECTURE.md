@@ -222,6 +222,8 @@ Smart 层间使用 `SmartLayerMemoryForecast` 的同窗分配和转移高水位�
 
 ## 奖励与商店建议
 
+`src/Advice/AdviceMechanics.cs` 定义已核对的入口／收益角色和有界配合评分；不执行卡牌效果，不推断无限循环。
+
 `src/Advice/RunAdvice.cs` 只接收不可变的值输入，输出边际收益排序、可用性、置信度与理由；不依赖搜索模拟器、RNG 或 UI。`RunAdviceCapture` 在主线程读取当前玩家与 MerchantEntry，保留当下价格和移除候选身份，不执行购买。`Runtime/RunAdvicePatches` 负责战斗外单人页面准入、原生奖励刷新与商店购买完成后刷新；`UI/RunAdviceBadge` 负责本地化、父节点内标签与生命周期。该建议不进入 CombatRootSnapshot、状态指纹、搜索预算或自动部署。
 
 ## 6. UI
@@ -316,3 +318,10 @@ renderer 不得重新读取 `SolverResult`、`PlanAction`、`PlanCardChoice` 或
 ### 预测洗牌排列缓存
 
 `src/Search/ProjectedShuffleCache.cs` 由每个 `SearchRunContext` 独占，按完整 `PredictionRngState` 与牌数缓存有界索引交换序列。当前卡牌每次先排序再应用序列；缓存不持有卡牌或模拟器。`ResetRebuildableCaches` 与 `ResetReclaimableCaches` 同步清空，跨 worker 不共享可变表。
+### 奖励评分捕获合同
+
+`tools/RunAdviceCaptureChecks` 链接生产 `RunAdviceCapture`，以 API 测试替身检查值快照、已审查来源与基础伤害字段。原生接口以主项目编译校验，游戏 Hook 和 UI 不在该工具证明范围内。`AdviceRating.Parts` 是 UI 的基础/配合/价格投影，覆盖标记独立于原生程序集来源。
+
+### 共享卡牌机制事实
+
+`src/Strategy/CardMechanismFacts` 保存已审查的纯值机制映射，由 Advice 主线程捕获和 Search 分支评估共用。它不读取 live model、UI、设置或 RNG，不承载模拟结算；战斗评估从分支 Preview 提供参数。

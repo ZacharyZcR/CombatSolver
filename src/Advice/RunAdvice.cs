@@ -7,15 +7,23 @@ internal enum AdviceTag
     Discard = 16, Exhaust = 32, Poison = 64, Orb = 128, Doom = 256, Shiv = 512,
 }
 
+internal enum AdviceCoverage { Unreviewed, Partial }
+
+internal sealed record AdviceScoreParts(double Base, double Synergy, double Price);
+
 internal enum AdviceKind { Card, Relic, Potion, Removal, Skip }
 
 internal sealed record AdviceCard(
     string Id, double Damage, double Block, double Draw, int Cost, bool Attack,
-    bool Basic, bool Curse, bool Removable, AdviceTag Tags, bool Known = true, int UpgradeLevel = 0);
+    bool Basic, bool Curse, bool Removable, AdviceTag Tags, bool Known = true, int UpgradeLevel = 0,
+    AdviceRole Roles = AdviceRole.None, double Stars = 0, int StarCost = 0,
+    double SourceAmount = 1, double Availability = 1, bool SingleUse = false,
+    AdviceCoverage Coverage = AdviceCoverage.Unreviewed, bool EnergyX = false, bool StarsX = false, double PayoffWeight = 1);
 
 internal sealed record AdviceContext(
     IReadOnlyList<AdviceCard> Deck, IReadOnlySet<string> Relics,
-    int Gold, int Hp, int MaxHp, int Act, int EmptyPotionSlots);
+    int Gold, int Hp, int MaxHp, int Act, int EmptyPotionSlots,
+    double StartingStars = 0, double SummonSupply = 0, double InitialFocusOrbs = 0, int BaseEnergy = 3);
 
 internal sealed record AdviceOffer(
     string Key, AdviceKind Kind, string Id, int Cost = 0,
@@ -23,7 +31,7 @@ internal sealed record AdviceOffer(
 
 internal sealed record AdviceRating(
     AdviceOffer Offer, double Score, int Rank, bool Available, bool Known,
-    IReadOnlyList<string> Reasons, string? RemovalCardId = null, int? RemovalDeckIndex = null);
+    IReadOnlyList<string> Reasons, string? RemovalCardId = null, int? RemovalDeckIndex = null, AdviceScoreParts? Parts = null);
 
 // Marginal deck improvement, not a forecast of an entire run. No live models or RNG.
 internal static class RunAdvice
@@ -50,11 +58,12 @@ internal static class RunAdvice
         string? removalId = null;
         int? removalIndex = null;
         double value;
+        double synergy = 0;
         switch (offer.Kind)
         {
             case AdviceKind.Card:
                 known = offer.Card?.Known == true;
-                value = offer.Card is { } card ? CardValue(context, card, reasons) : 0;
+                value = offer.Card is { } card ? CardValue(context, card, reasons, out synergy) : 0;
                 break;
             case AdviceKind.Relic:
                 (value, known) = RelicValue(context, offer.Id, reasons);
@@ -65,7 +74,7 @@ internal static class RunAdvice
             case AdviceKind.Removal:
                 var removable = context.Deck.Select((c, index) => (Card: c, Index: index))
                     .Where(c => c.Card.Removable)
-                    .Select(c => (c.Card, c.Index, Value: RemovalValue(context, c.Card)))
+                    .Select(c => (c.Card, c.Index, Value: RemovalValue(context, c.Index)))
                     .OrderByDescending(c => c.Value).FirstOrDefault();
                 value = removable.Card is null ? -100 : removable.Value;
                 removalId = removable.Card?.Id;
@@ -82,6 +91,7 @@ internal static class RunAdvice
             value = fallback;
             reasons.Add("通用稀有度参考");
         }
+        double beforePrice = value;
         bool available = offer.Available && (!shop || offer.Cost <= context.Gold);
         if (shop && offer.Cost > context.Gold) reasons.Add("金币不足");
         if (offer.Kind == AdviceKind.Potion && context.EmptyPotionSlots == 0)
@@ -98,26 +108,43 @@ internal static class RunAdvice
             reasons.Add("已考虑价格与留钱");
         }
         if (!known) reasons.Add("效果规则未覆盖");
-        return new AdviceRating(offer, value, 0, available, known, reasons, removalId, removalIndex);
+        return new AdviceRating(offer, value, 0, available, known, reasons, removalId, removalIndex,
+            new AdviceScoreParts(beforePrice - synergy, synergy, value - beforePrice));
     }
 
     internal static double CardValue(AdviceContext context, AdviceCard card, List<string> reasons)
+        => CardValue(context, card, reasons, out _);
+
+    private static double CardValue(AdviceContext context, AdviceCard card, List<string> reasons, out double synergy)
     {
+        synergy = 0;
         if (card.Curse) { reasons.Add("增加牌组负担"); return -25; }
         int size = Math.Max(1, context.Deck.Count);
-        double attacks = context.Deck.Count(c => c.Attack) / (double)size;
+        double attacks = context.Deck.Count(c => c.Attack || c.Damage > 0) / (double)size;
         double blocks = context.Deck.Count(c => c.Block > 0) / (double)size;
-        double value = Math.Min(14, card.Damage * 0.8 + card.Block * 0.7) - 6;
-        if (card.Damage > 0 && attacks < 0.4) { value += 7; reasons.Add("补充输出"); }
+        double damage = card.Roles.HasFlag(AdviceRole.OstyAttack)
+            && AdviceMechanics.SourceSupply(context, AdviceRole.SummonSource) == 0 ? 0 : card.Damage;
+        double face = Math.Max(0, damage * 0.8 + card.Block * 0.7);
+        double value = Math.Min(14, face) + 4 * Math.Log(1 + Math.Max(0, face - 14) / 4) - 6;
+        if (damage > 0 && attacks < 0.4) { value += 7; reasons.Add("补充输出"); }
         if (card.Block > 0 && blocks < 0.3) { value += 7; reasons.Add("补充防御"); }
         if (card.Tags.HasFlag(AdviceTag.Draw))
         {
-            value += 5 + Math.Min(5, card.Draw * 2);
+            value += (5 + Math.Min(5, card.Draw * 2)) * DeckMechanismProfile.DrawDemand(
+                size, context.Deck.Sum(AdviceMechanics.DrawSupply));
             reasons.Add("改善抽牌");
+        }
+        double indirectDraw = AdviceMechanics.IndirectDrawSupply(card);
+        if (indirectDraw > 0)
+        {
+            value += Math.Min(8, 4 * indirectDraw) * DeckMechanismProfile.DrawDemand(
+                size, context.Deck.Sum(AdviceMechanics.DrawSupply));
+            reasons.Add("生成灵魂提供后续抽牌，已折算延迟与一次性供给");
         }
         if (card.Tags.HasFlag(AdviceTag.Energy))
         {
-            value += context.Deck.Count(c => c.Cost >= 2) >= 4 ? 12 : 6;
+            value += DeckMechanismProfile.EnergyDemand(context.Deck.Count(c => !c.EnergyX && c.Cost >= 2),
+                context.Deck.Count(c => c.Tags.HasFlag(AdviceTag.Energy)));
             reasons.Add("补充能量");
         }
         if (card.Tags.HasFlag(AdviceTag.Area))
@@ -130,41 +157,84 @@ internal static class RunAdvice
             value += context.Deck.Count(c => c.Tags.HasFlag(AdviceTag.Scaling)) < 2 ? (context.Act == 0 ? 10 : 12) : 3;
             reasons.Add("提供持续效果");
         }
-        AdviceTag[] archetypes = [AdviceTag.Discard, AdviceTag.Exhaust, AdviceTag.Poison,
-            AdviceTag.Orb, AdviceTag.Doom, AdviceTag.Shiv];
+        AdviceTag[] archetypes = [AdviceTag.Poison, AdviceTag.Doom, AdviceTag.Shiv];
         foreach (AdviceTag tag in archetypes)
         {
             if (!card.Tags.HasFlag(tag)) continue;
+            if (tag == AdviceTag.Poison && (card.Roles & (AdviceRole.PoisonSource | AdviceRole.PoisonPayoff)) != 0)
+                continue;
+            if (tag == AdviceTag.Doom && (card.Roles & (AdviceRole.DoomSource | AdviceRole.DoomPayoff)) != 0)
+                continue;
+            if (tag == AdviceTag.Shiv && (card.Roles & (AdviceRole.ShivSource | AdviceRole.ShivPayoff)) != 0)
+                continue;
             int support = context.Deck.Count(c => c.Tags.HasFlag(tag));
-            if (support < 2) continue;
-            value += Math.Min(7, support * 1.5);
-            reasons.Add("契合现有体系");
-            break;
+            if (support >= 2) synergy = Math.Max(synergy, Math.Min(7, support * 1.5));
         }
+        if (synergy > 0) reasons.Add("契合现有体系");
+        synergy += AdviceMechanics.Value(context, card, reasons);
         if ((context.Relics.Contains("KUNAI") || context.Relics.Contains("SHURIKEN")
-                || context.Relics.Contains("ORNAMENTAL_FAN")) && card.Attack && card.Cost <= 1)
-        { value += 4; reasons.Add("配合连续攻击遗物"); }
-        if (context.Relics.Contains("SNECKO_EYE") && card.Cost >= 2)
-        { value += 5; reasons.Add("配合费用随机遗物"); }
-        else if (card.Cost >= 2 && !context.Deck.Any(c => c.Tags.HasFlag(AdviceTag.Energy)))
+                || context.Relics.Contains("ORNAMENTAL_FAN")) && card.Attack && !card.EnergyX && card.Cost <= 1)
+        { synergy += 4; reasons.Add("配合连续攻击遗物"); }
+        if (context.Relics.Contains("SNECKO_EYE") && !card.EnergyX && card.Cost >= 2)
+        { synergy += 5; reasons.Add("配合费用随机遗物"); }
+        else if (!card.EnergyX && card.Cost >= 2 && !context.Deck.Any(c => c.Tags.HasFlag(AdviceTag.Energy)))
         { value -= 3 * (card.Cost - 1); reasons.Add("费用偏高"); }
         int copies = context.Deck.Count(c => c.Id == card.Id);
-        if (copies > 0) { value -= copies * 3; reasons.Add("已有同名牌"); }
+        if (copies > 0 && card.Id != "CLAW") { value -= copies * 3; reasons.Add("已有同名牌"); }
+        if (copies > 0 && card.Id == "CLAW") { synergy += Math.Min(6, copies * 2); reasons.Add("同名爪击共享本战成长"); }
         if (card.Basic) { value -= 7; reasons.Add("基础牌收益有限"); }
         if (size > 20 && !card.Tags.HasFlag(AdviceTag.Draw))
         { value -= Math.Min(8, (size - 20) * 0.5); reasons.Add("牌组已经偏厚"); }
         if (reasons.Count == 0) reasons.Add("通用牌面价值");
-        return value;
+        return value + synergy;
     }
 
-    private static double RemovalValue(AdviceContext context, AdviceCard card)
+    internal static double RemovalValue(AdviceContext context, int index)
     {
-        if (card.Curse) return context.Relics.Contains("DU_VU_DOLL") ? 18 : 28;
-        if (!card.Basic) return Math.Max(-8, -CardValue(context, card, []) * 0.5);
-        bool scarce = card.Attack
-            ? context.Deck.Count(c => c.Attack && !c.Basic) < 2
-            : context.Deck.Count(c => c.Block > 0 && !c.Basic) < 2;
-        return (scarce ? 3 : 15) - card.UpgradeLevel * 4;
+        AdviceCard card = context.Deck[index];
+        AdviceContext remaining = context with
+        {
+            Deck = context.Deck.Where((_, i) => i != index).ToArray(),
+        };
+        double value;
+        if (card.Curse)
+            value = context.Relics.Contains("DU_VU_DOLL") ? 18 : 28;
+        else if (card.Basic)
+        {
+            bool scarce = card.Attack
+                ? remaining.Deck.Count(c => c.Attack && !c.Basic) < 2
+                : remaining.Deck.Count(c => c.Block > 0 && !c.Basic) < 2;
+            value = (scarce ? 3 : 15) - card.UpgradeLevel * 4;
+        }
+        else
+            value = Math.Max(-8, -CardValue(remaining, card, []) * 0.5);
+        // Compare each surviving component with itself excluded on both sides.
+        // This accounts for breaking the last source, rather than treating removal
+        // as merely the opposite of buying one more copy.
+        double synergyChange = 0;
+        for (int i = 0; i < context.Deck.Count; i++)
+        {
+            if (i == index) continue;
+            AdviceCard survivor = context.Deck[i];
+            AdviceContext before = context with
+            {
+                Deck = context.Deck.Where((_, j) => j != i).ToArray(),
+            };
+            AdviceContext after = context with
+            {
+                Deck = context.Deck.Where((_, j) => j != i && j != index).ToArray(),
+            };
+            synergyChange += CardValue(after, survivor, [])
+                - CardValue(before, survivor, []);
+        }
+        foreach (string relic in context.Relics)
+        {
+            var before = RelicValue(context, relic, []);
+            var after = RelicValue(remaining, relic, []);
+            if (before.Item2 && after.Item2)
+                synergyChange += after.Item1 - before.Item1;
+        }
+        return value + Math.Clamp(synergyChange, -20, 20);
     }
 
     private static (double, bool) RelicValue(AdviceContext context, string id, List<string> reasons)
@@ -175,7 +245,7 @@ internal static class RunAdvice
             "ANCHOR" or "HORN_CLEAT" or "CAPTAINS_WHEEL" => 22,
             "BAG_OF_PREPARATION" or "LANTERN" or "HAPPY_FLOWER" => 25,
             "KUNAI" or "SHURIKEN" or "ORNAMENTAL_FAN" =>
-                context.Deck.Count(c => c.Attack && c.Cost <= 1) >= 6 ? 34 : 14,
+                context.Deck.Count(c => c.Attack && !c.EnergyX && c.Cost <= 1) >= 6 ? 34 : 14,
             "PEN_NIB" or "AKABEKO" => context.Deck.Count(c => c.Attack) >= 5 ? 23 : 10,
             "LETTER_OPENER" => context.Deck.Count(c => !c.Attack) >= 8 ? 26 : 12,
             "TOUGH_BANDAGES" or "TINGSHA" =>
@@ -205,7 +275,7 @@ internal static class RunAdvice
             "FAIRY_IN_A_BOTTLE" or "GHOST_IN_A_JAR" => 26,
             "REGEN_POTION" or "FRUIT_JUICE" => 20,
             "POISON_POTION" => context.Deck.Any(c => c.Tags.HasFlag(AdviceTag.Poison)) ? 18 : 11,
-            "FOCUS_POTION" => context.Deck.Any(c => c.Tags.HasFlag(AdviceTag.Orb)) ? 20 : -10,
+            "FOCUS_POTION" => AdviceMechanics.SourceSupply(context, AdviceRole.FocusOrbSource) > 0 ? 20 : -10,
             _ => double.NaN,
         };
         if (double.IsNaN(value)) return (0, false);

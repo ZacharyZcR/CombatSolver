@@ -24,3 +24,5 @@
 | 0.19 | [0.19.0](0.19.0-RELEASE_NOTES.md) |
 | 0.18 | [0.18.0](0.18.0-RELEASE_NOTES.md) |
 | 0.17 | [0.17.2](0.17.2-RELEASE_NOTES.md) · [0.17.1](0.17.1-RELEASE_NOTES.md) · [0.17.0](0.17.0-RELEASE_NOTES.md) |
+
+- [0.34.10 本地测试版](0.34.10-RELEASE_NOTES.md)

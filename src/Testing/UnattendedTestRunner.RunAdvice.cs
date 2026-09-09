@@ -1,5 +1,7 @@
 using Godot;
+using CombatSolver.Engine.Common;
 using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.CardRewardAlternatives;
 using MegaCrit.Sts2.Core.Entities.Merchant;
@@ -9,6 +11,8 @@ using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Map;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Cards;
+using MegaCrit.Sts2.Core.Models.Powers;
+using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.Rooms;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
@@ -24,16 +28,120 @@ internal sealed partial class UnattendedTestRunner
         if (!condition) throw new InvalidOperationException("RunAdvice: " + message);
     }
 
-    private async Task AssertRunAdviceAsync(Player player)
+    private async Task AssertRunAdviceAsync(Player player, CombatState nativeCombat)
     {
+        PredictedCard[] corruptionFuel = new CardModel[] { ModelDb.Card<DefendIronclad>(), ModelDb.Card<BladeDance>(),
+            ModelDb.Card<Shiv>(), ModelDb.Card<StrikeIronclad>() }
+            .Select(m => PredictedCard.Create(m, player)).ToArray();
+        var fuelWithout = StrategicEffectContext.Build(corruptionFuel, 100, 0, 0, StrategicEffectRequirements.ExhaustPlays);
+        var fuelWith = StrategicEffectContext.Build(corruptionFuel, 100, 0, 0, StrategicEffectRequirements.ExhaustPlays, skillsExhaust: true);
+        AdviceAssert(fuelWithout.ExhaustPlays == 2 && fuelWith.ExhaustPlays == 3,
+            "Corruption adds ordinary Skills without double-counting exhausting Skills or converting attacks");
+        PredictedCard[] cloakDeck = new CardModel[] { ModelDb.Card<CloakAndDagger>(), ModelDb.Card<DefendIronclad>(),
+            ModelDb.Card<DefendIronclad>(), ModelDb.Card<DefendIronclad>() }
+            .Select(m => PredictedCard.Create(m, player)).ToArray();
+        var reusableCloak = StrategicEffectContext.Build(cloakDeck, 100, 0, 0, StrategicEffectRequirements.ShivPlays);
+        var corruptedCloak = StrategicEffectContext.Build(cloakDeck, 100, 0, 0, StrategicEffectRequirements.ShivPlays, skillsExhaust: true);
+        AdviceAssert(reusableCloak.ShivPlays > 1 && corruptedCloak.ShivPlays == 1,
+            "Corruption makes an otherwise reusable Skill generator a finite source");
+        _completedChecks.Add("RunAdvice:NativeCorruptionFuel:NoDoubleCount:FiniteGenerator");
+        foreach (bool noDrawFirst in new[] { true, false })
+        {
+            using PendingEnemyDeathFixture fixture = CreatePendingEnemyDeathFixture(nativeCombat, player, victimCount: 0);
+            if (noDrawFirst) fixture.Combat.AddPowerInstance<NoDrawPower>(player.Creature, 1, player.Creature);
+            var embrace = fixture.Combat.AddPowerInstance<DarkEmbracePower>(player.Creature, 1, player.Creature);
+            if (!noDrawFirst) fixture.Combat.AddPowerInstance<NoDrawPower>(player.Creature, 1, player.Creature);
+            PredictedCard[] hand = [PredictedCard.Create(ModelDb.Card<Dazed>(), player)];
+            var forecast = StrategicEffectContext.Build(hand, 1, 0, 0, StrategicEffectModel.Requirements(embrace))
+                .WithExhaustDrawTiming(fixture.Combat.EffectivePowers(), hand, player.Creature);
+            AdviceAssert(forecast.ExhaustDrawPlays == (noDrawFirst ? 1 : 0),
+                "branch-owned exhaust draw forecast retains native Power order");
+            AdviceAssert(StrategicEffectModel.Evaluate(embrace, forecast).CardAccessPotential > 0 == noDrawFirst,
+                "Dark Embrace evaluation consumes the ordered draw forecast");
+        }
+        _completedChecks.Add("RunAdvice:NativeExhaustDrawTiming:BranchPowers:Evaluation");
+        foreach (CardModel[] models in new CardModel[][]
+            { [ModelDb.Card<BladeDance>()], [ModelDb.Card<Shiv>(), ModelDb.Card<Shiv>()],
+                [ModelDb.Card<BladeDance>(), ModelDb.Card<Shiv>()], [ModelDb.Card<DefendIronclad>()] })
+        {
+            PredictedCard[] predicted = models.Select(m => new PredictedCard(player.RunState.CreateCard(m, player))).ToArray();
+            var strengthOnly = StrategicEffectContext.Build(predicted, 100, 0, 0, StrategicEffectRequirements.AttackHits);
+            var combined = StrategicEffectContext.Build(predicted, 100, 0, 0,
+                StrategicEffectRequirements.AttackHits | StrategicEffectRequirements.ShivPlays);
+            AdviceAssert(strengthOnly.AttackHits == combined.ShivPlays && combined.AttackHits == combined.ShivPlays,
+                "Strength and Accuracy share existing/generated Shiv estimates without double counting");
+            AdviceAssert(models[0] is DefendIronclad ? strengthOnly.AttackHits == 0 : strengthOnly.AttackHits > 0,
+                "native Strength context recognizes Shiv sources without inventing attacks");
+        }
+        _completedChecks.Add("RunAdvice:NativeStrategicStrengthShivs:Requirements:NoDoubleCount:NoAttack");
+        foreach (var (model, stock) in new (CardModel, int)[]
+            { (ModelDb.Card<BladeDance>(), 3), (ModelDb.Card<FanOfKnives>(), 4), (ModelDb.Card<CloakAndDagger>(), 1) })
+        {
+            PredictedCard[] cardsForCycles = new CardModel[] { model, ModelDb.Card<DefendIronclad>(),
+                ModelDb.Card<DefendIronclad>(), ModelDb.Card<DefendIronclad>() }
+                .Select(m => new PredictedCard(player.RunState.CreateCard(m, player))).ToArray();
+            var forecast = StrategicEffectContext.Build(cardsForCycles, 100, 0, 0,
+                StrategicEffectRequirements.AttackHits | StrategicEffectRequirements.ShivPlays);
+            AdviceAssert(model is CloakAndDagger ? forecast.ShivPlays > stock : forecast.ShivPlays == stock,
+                "native generator lifetime bounds repeated-cycle supply");
+            AdviceAssert(forecast.AttackHits == forecast.ShivPlays, "finite source bound is shared by Strength");
+        }
+        _completedChecks.Add("RunAdvice:NativeFiniteShivGenerators:Exhaust:Power:Reusable");
         var bladeDance = RunAdviceCapture.Card(ModelDb.Card<BladeDance>());
         AdviceAssert(!bladeDance.Tags.HasFlag(AdviceTag.Draw), "generated cards must not be labeled as draw");
         AdviceAssert(RunAdviceCapture.Card(ModelDb.Card<ShrugItOff>()).Tags.HasFlag(AdviceTag.Draw),
             "actual card draw classification");
+        foreach (var (model, countVariable) in new (CardModel, string)[]
+            { (ModelDb.Card<BladeDance>(), "Cards"), (ModelDb.Card<CloakAndDagger>(), "Cards"), (ModelDb.Card<FanOfKnives>(), "Shivs") })
+        {
+            CardModel generator = player.RunState.CreateCard(model, player);
+            for (int level = 0; level < 2; level++)
+            {
+                AdviceAssert(RunAdviceCapture.Card(generator).Damage == (double)(
+                    ModelDb.Card<Shiv>().DynamicVars.Damage.BaseValue * generator.DynamicVars[countVariable].BaseValue),
+                    $"native generated Shiv output capture: {model.Id}, upgrade={level}");
+                if (level == 0) CardCmd.Upgrade(generator, CardPreviewStyle.None);
+            }
+        }
+        _completedChecks.Add("RunAdvice:NativeShivGeneratorDamage:BaseAndUpgraded");
+        CardModel[] payoffModels = [ModelDb.Card<Accuracy>(), ModelDb.Card<FeelNoPain>(),
+            ModelDb.Card<Reflex>(), ModelDb.Card<Tactician>(), ModelDb.Card<Haunt>(),
+            ModelDb.Card<DevourLife>(), ModelDb.Card<Defragment>(), ModelDb.Card<Accelerant>()];
+        foreach (CardModel model in payoffModels)
+        {
+            CardModel card = player.RunState.CreateCard(model, player);
+            AdviceCard beforeUpgrade = RunAdviceCapture.Card(card);
+            CardCmd.Upgrade(card, CardPreviewStyle.None);
+            AdviceCard afterUpgrade = RunAdviceCapture.Card(card);
+            AdviceAssert(beforeUpgrade.PayoffWeight == 1 && afterUpgrade.PayoffWeight > 1,
+                $"native upgraded payoff capture: {model.Id}");
+        }
+        _completedChecks.Add("RunAdvice:NativeUpgradeCapture:EightPayoffs");
         AdviceCard strike = new("STRIKE_IRONCLAD", 6, 0, 0, 1, true, true, false, true, AdviceTag.None);
         AdviceCard defend = strike with { Id = "DEFEND_IRONCLAD", Damage = 0, Block = 5, Attack = false };
         AdviceContext context = new(Enumerable.Repeat(strike, 5).Concat(Enumerable.Repeat(defend, 5)).ToArray(),
             new HashSet<string>(), 100, 50, 80, 0, 1);
+        AdviceAssert(ModelDb.Card<Soul>().DynamicVars.Cards.BaseValue == 2,
+            "reviewed unupgraded Soul supplies two cards of draw");
+        foreach (CardModel model in new CardModel[] { ModelDb.Card<GraveWarden>(), ModelDb.Card<Reave>(), ModelDb.Card<Severance>() })
+        {
+            AdviceCard generatedDraw = RunAdviceCapture.Card(player.RunState.CreateCard(model, player));
+            AdviceCard withoutSource = generatedDraw with { Roles = generatedDraw.Roles & ~AdviceRole.SoulSource };
+            AdviceAssert(!generatedDraw.Tags.HasFlag(AdviceTag.Draw) && AdviceMechanics.IndirectDrawSupply(generatedDraw) > 0,
+                "native Soul source stays distinct from direct draw");
+            foreach (bool shopMode in new[] { false, true })
+            {
+                AdviceRating[] values = RunAdvice.Rank(context,
+                    [new("source", AdviceKind.Card, generatedDraw.Id, Card: generatedDraw),
+                     new("control", AdviceKind.Card, generatedDraw.Id, Card: withoutSource)], shopMode);
+                AdviceAssert(values[0].Score > values[1].Score, "native indirect draw improves reward and equal-price shop value");
+            }
+            AdviceCard noDraw = RunAdviceCapture.Card(ModelDb.Card<BattleTrance>());
+            AdviceAssert(AdviceMechanics.Value(context with { Deck = [generatedDraw] }, noDraw, [])
+                < AdviceMechanics.Value(context with { Deck = [withoutSource] }, noDraw, []),
+                "native NoDraw scoring recognizes Soul supply");
+        }
+        _completedChecks.Add("RunAdvice:NativeSoulDraw:IndependentValue:Shop:NoDraw:DistinctTiming");
         AdviceOffer skip = new("skip", AdviceKind.Skip, "skip");
         var poor = RunAdvice.Rank(context, [new("basic", AdviceKind.Card, strike.Id, Card: strike), skip], false);
         AdviceAssert(poor[1].Rank == 1 && poor[0].Rank > 1, "skip must beat redundant basics");
@@ -68,7 +176,8 @@ internal sealed partial class UnattendedTestRunner
         foreach (var slot in shop.GetAllSlots().Where(s => s.Entry.IsStocked))
             AdviceAssert(slot.GetNodeOrNull<Label>(RunAdviceBadge.NodeName) is { } label
                 && !string.IsNullOrWhiteSpace(label.Text)
-                && label.MouseFilter == Control.MouseFilterEnum.Ignore, "native merchant slot badge");
+                && label.MouseFilter == Control.MouseFilterEnum.Pass
+                && !string.IsNullOrWhiteSpace(label.TooltipText), "native merchant slot badge and non-blocking detail tooltip");
         _completedChecks.Add("RunAdvice:NativeShop:Cards:Relics:Potions:Removal:NonBlockingLabels");
         if (DisplayServer.GetName() != "headless")
         {
@@ -105,6 +214,10 @@ internal sealed partial class UnattendedTestRunner
         foreach (var card in cards)
             AdviceAssert(screen.GetCardHolder(card.Card).GetNodeOrNull<Label>(RunAdviceBadge.NodeName) is not null,
                 "native reward patch attaches each badge");
+        AdviceCard accuracy = RunAdviceCapture.Card(ModelDb.Card<Accuracy>()) with { PayoffWeight = 1.5 };
+        var profile = DeckMechanismProfile.Capture(context with
+            { Deck = [bladeDance, accuracy, RunAdviceCapture.Card(ModelDb.Card<GraveWarden>())] });
+        RunAdviceBadge.Summary(screen, "尚未识别成型配合", reward: true, profile: profile);
         string language = LocManager.Instance.Language;
         try
         {
@@ -114,7 +227,17 @@ internal sealed partial class UnattendedTestRunner
                 await NextFrameAsync();
                 await NextFrameAsync();
                 string text = screen.GetCardHolder(cards[0].Card).GetNode<Label>(RunAdviceBadge.NodeName).Text;
-                AdviceAssert(text.Contains(locale == "eng" ? "Score " : "评分 "), "live label language refresh");
+                AdviceAssert(text.Contains(locale == "eng" ? "Estimate " : "参考分 "), "live label language refresh");
+                Label summary = screen.GetNode<Label>("CombatSolverAdviceSummary");
+                AdviceAssert(summary.TooltipText.Contains(SolverText.Format($"供给权重 {profile.Mechanisms[5].Balance.Supply:F1} / 兑现权重 {1.5:F1}")),
+                    "profile tooltip preserves fractional payoff and refreshes language");
+                AdviceAssert(profile.IndirectDrawSupply > 0 && summary.TooltipText.Contains(
+                    SolverText.Format($"间接抽牌供给权重 {profile.IndirectDrawSupply:F1}")),
+                    "profile tooltip localizes native indirect draw supply");
+                AdviceAssert(summary.Text.Contains(SolverText.Format($"配合指数 {100 * profile.Mechanisms[5].Balance.Readiness:F1}")),
+                    "profile summary uses the scoring readiness");
+                AdviceAssert(summary.MouseFilter == Control.MouseFilterEnum.Pass,
+                    "profile tooltip is reachable without stopping parent input");
                 foreach (var rating in poor.Concat(good).Concat(unavailable).Concat(removal).Concat(generic))
                     foreach (string reason in rating.Reasons) _ = SolverText.Get(reason);
             }
@@ -123,6 +246,8 @@ internal sealed partial class UnattendedTestRunner
             AdviceAssert(screen.GetNode<Control>("UI/CardRow").GetChildren()
                 .OfType<MegaCrit.Sts2.Core.Nodes.Cards.Holders.NGridCardHolder>()
                 .Count(c => !c.IsQueuedForDeletion()) == 3, "reward reroll has no stale holders");
+            AdviceAssert(screen.GetChildren().OfType<Label>().Count(c => c.Name == "CombatSolverAdviceSummary") == 1,
+                "reward reroll replaces the profile summary");
             if (DisplayServer.GetName() != "headless")
             {
                 await Task.Delay(1100);

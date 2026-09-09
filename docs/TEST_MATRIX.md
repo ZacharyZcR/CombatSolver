@@ -1,5 +1,11 @@
 # CombatSolver 测试清单
 
+## 0.34.10 本地测试版
+
+整合验证：Release 编译零警告/错误；RunAdvice 105834、Capture 58、PotionInventory 21220、SearchObjective 227、ProjectedShuffle 2700 项检查通过。整合原生 RUN-ADVICE：`17b6654172ad431d9ef9909a3e534978` Passed，覆盖奖励、商店购买刷新、语言切换与机制画像。
+
+整合 0.34.9 的缓存、成长/收益详情与达标停止逻辑，以及机制画像、选牌数值评分、满栏药水策略和消耗机制评估。Corruption 原生定向检查已通过：`b591965de44c4729ad7561f0d7b8ed11`。
+
 ## 0.34.9 试玩：收益目标达标停止
 
 - 永久成长默认 3 点、净资源默认 25 分，并分别提供 UI 输入。旧配置或显式输入 0 采用有限默认，不再表示无限收益；已设置的正目标值保留。
@@ -37,6 +43,301 @@
 - 本轮不启动游戏、不覆盖安装；正式固定工作量搜索、增量回放及可见性能尚未验证。
 
 ## 0.34.8 试玩：无目标收益路线回退
+## 下一版本（开发中）：消耗抽牌潜力按禁抽时序估计
+
+- StrategicEffectContext 新增可选 ExhaustDrawPlays，Dark Embrace 使用它而非不区分时机的 ExhaustPlays。生产快照使用分支有效 Power 顺序与分支手牌计算：当前 NoDraw 折减普通消耗抽牌，后续回合保留有界份额；手中 Ethereal 按回合末 Hook 顺序计收益，同时带 Exhaust 的实例不重复计数。
+- 只有当前存在自身 Dark Embrace 的快照才做额外 Power/手牌检查；没有读取实时卡牌堆或语言，没有改变终局比较和实际模拟。未来回合份额仍是近似，不是已证明的执行计划。
+- RunAdviceChecks 105,834 项通过，新增五项分别覆盖当前禁抽、未来窗口、延后抽牌两种顺序和无禁抽。Release 编译通过，接口手册同步可选字段及回退口径。
+- 原生分支合同 `2f9c2fdf44034560b0eb1a1faaa1f06f` Passed，使用克隆战斗里的 Power 顺序与预测手牌，确认 ExhaustDrawPlays 为 1/0 且真正影响 Dark Embrace 的 CardAccessPotential。
+- 短搜/部署目标 `85fa3f9e177f4e75b74ae1d3f898a6e1` Passed：Dark Embrace→Shiv→抽到 Strike 完成首回合击杀；禁抽哨兵 `fb8e688ad76e41639671969367d5ac4b` Passed：只用已有攻击击杀，不打无效 Dark Embrace。两者均零战损、零计划外重算；固定 3 秒短搜和 120 秒请求上限。
+- 原生四组时序差分的模拟输入与代码未变，复用既有证据，不重复同一差分。最终合同后隔离进程已退出，正式游戏安装未改动。
+
+
+## 下一版本（开发中）：NoDraw 与消耗抽牌最小差分
+
+- `coverage/unattended/dark-embrace-draw-timing.json` 含四个最小请求：普通小刀消耗与虚无牌回合末消耗，分别按 NoDraw→DarkEmbrace 和相反顺序施加。只观察首个相关结算边界，不进入下一回合准备。
+- 游戏 v0.111.0 / RitsuLib 0.5.18 run `6fe4ee613293469c80fcf107128ff1ce` Passed（30.52 秒），四组均通过 actual/simulated 快照差分，包含牌堆顺序、Power 状态/内部状态、资源与显式手牌数量断言。
+- 普通消耗两种顺序均为 0 张；虚无消耗中 NoDraw 先施加时回合末留下 1 张、DarkEmbrace 先施加时 0 张。确认 AfterSideTurnEnd 的禁抽移除与延后抽牌顺序不能忽略，也不能把延后抽牌等同下一回合起手抽牌。
+- 复跑入口：`tools/run-unattended-test.ps1 -ScenarioId DARK-EMBRACE-DRAW-TIMING -CharacterId IRONCLAD -MonsterMoveChecksPath coverage/unattended/dark-embrace-draw-timing.json -TimeoutSeconds 120 -ExitOnComplete`，路径按环境覆盖；Bash 使用对应长参数。未修改行为源码，无需重建；隔离实例已退出。
+- 这一步确立接入战斗潜力估计前的语义边界，尚未修复 NoDraw 的潜力评分。不能仅按是否存在 NoDraw 将整个预测窗口的 DarkEmbrace 价值归零。
+
+
+## 下一版本（开发中）：Soul 间接抽牌原生合同
+
+- 游戏 v0.111.0 / RitsuLib 0.5.18 的 RUN-ADVICE run `5113cd8fad094e4bb8028340c2321d77` Passed，23.68 秒。原生 Soul 的基础抽牌变量为 2；Grave Warden / Reave / Severance 均捕获为非即时 Draw 的间接来源。
+- 三种真实来源分别提高无兑现引擎时的奖励和同价商店分数，并使 NoDraw 识别其冲突；使用移除 SoulSource 角色的受控副本对照，其他牌面值保留。画像详情在 eng/zhs/zht 切换后保留正确的间接供给小数。
+- 同时通过既有升级捕获、小刀上下文、原生购买刷新、奖励重掷和摘要替换检查。Release 编译通过，完成后测试实例自动退出。
+- 本合同验证原生捕获、评分和界面字符串链路，不是生成后抽牌的完整实战差分，也不证明整局推荐质量；本次 headless 未追加排版截图，正式安装未改动。
+
+
+## 下一版本（开发中）：灵魂生成的独立过牌价值
+
+- 生成 Soul 的卡牌此前只有画像配合价值，未计其独立过牌用途。现在已识别来源的数量、延迟与一次性折算供给形成有上限的基础抽牌奖励；不需要 Haunt 等兑现牌才有价值，也不把生成牌标成即时 Draw。
+- 直接抽牌与间接供给共同降低追加过牌的边际需求；画像保留单独的间接供给权重，用于抽牌缺口判断并显示在详情。NoDraw 候选也识别牌组已有 Soul 供给的冲突，与反向加牌场景一致。
+- RunAdviceChecks 105,829 项和 RunAdviceCaptureChecks 58 项通过；新增六项覆盖独立价值、一次性折算、不可用来源、画像供给、NoDraw 冲突与抽牌边际递减。Release 编译通过，中文/英文详情同步。
+- 这是奖励与商店的折算估值，不是确定回合的抽牌预测；生成、抽到和再次打出仍有成本。本次未启动原生游戏验证新分数或 UI，未改变战斗模拟和玩家安装。
+
+
+## 下一版本（开发中）：一次性小刀生成器的有限供给
+
+- 原生 Blade Dance 带 Exhaust，Fan of Knives 是 Power，其小刀生成批次不能随预计牌组循环重复。上下文现在捕获一次性生成量和一次性生成器数量；小刀打出与生成启动分别受库存上限约束，力量与 Accuracy 共用这份估计。Cloak and Dagger 等可重复来源保留循环潜力。
+- RunAdviceChecks 105,823 项通过，新增 35 项覆盖两类有限生成、可重复来源、力量一致性及行动预算 0..30 的库存上限。Release 编译与 diff 检查通过。
+- 原生 RUN-ADVICE `63343ad4f8954c78b4dcbee7f7b93b74` Passed：在足以跨牌组循环的预测窗口中，Blade Dance 上限 3、Fan of Knives 上限 4、Cloak and Dagger 可超过单次生成量；Strength 与 ShivPlays 一致。
+- 原生目标 `27d9ef454e4d463a86259d07da18f7a6` 和不需力量的哨兵 `24f53207fc0943bba84b9572e147ce99` 均 Passed，首回合胜利、零战损、零计划外重算。固定 3 秒短搜与 120 秒请求上限，顺序复用隔离进程并在最终合同后退出。
+- 这是对已审查即时生成器生命周期的估计修正，不证明完整循环或所有修改词条的第三方效果；未改正式游戏安装。
+
+
+## 下一版本（开发中）：力量共享小刀来源与行动预算
+
+- AttackHits 单独请求时也捕获小刀生成来源；已有小刀排除在普通攻击命中计数之外，与生成小刀一起受同一行动预算约束，生成器启动占用行动，普通攻击仅使用剩余部分。没有小刀时保留普通攻击估计。
+- RunAdviceChecks 105,788 项通过，新增六个纯值边界；Release 编译通过。原生 Build 合同 run `c310b7ef30bc445cacfcde572b6291a1` Passed，检验只有生成器、只有现有小刀、混合与无攻击来源，以及 AttackHits 单独/联合请求一致性。
+- `profile-strength-shiv-deploy.json` run `495f6dd35b9646388da1ed29a381d778` Passed：先 Inflame 后生成小刀击杀 18 HP 敌人；`profile-strength-shiv-no-setup.json` run `47570057e4be4561b40f83d45e96fbfd` Passed：12 HP 敌人仅打 Blade Dance，不打 Inflame。两者均第 1 回合胜利、零战损、零计划外重算，固定 3 秒短搜与 120 秒请求上限。
+- 使用同一个隔离实例顺序复用，最后合同执行后自动退出。该结果证明上下文缺口与所测部署路线，不证明完整循环可执行或相对旧版的整局胜率提升；未改玩家正式安装。
+
+
+## 下一版本（开发中）：小刀生成牌基础输出评分
+
+- Blade Dance、Cloak and Dagger、Fan of Knives 之前仅提供画像来源，缺少普通 Damage 变量使基础输出被记为 0。现在计入生成数量 × 原生未升级小刀 4 点基础伤害；保留直接格挡，升级增加生成数量会增加基础值。
+- 输出缺口统计同时识别已捕获的生成伤害，避免多张输出型 Skill 仍被当作完全没有输出。生成输出作为潜力值，说明需后续出牌和手牌空间；不假定集中、力量、Accuracy 或生成牌升级效果，延迟生成的 Infinite Blades 不套立即批量伤害。
+- RunAdviceChecks 105,782 项、RunAdviceCaptureChecks 58 项与 Release 编译通过。原生 RUN-ADVICE run `92af912a57254587b74ceecbf6d534f0` Passed（24.39 秒），逐张对照原生 Shiv 伤害变量和生成数量，覆盖三种牌未升级/升级共六组，同时保留原生购买、奖励刷新和语言检查。
+- 本次原生检查为 headless，不重做未变化的排版截图；没有修改战斗模拟或正式游戏安装。
+
+
+## 下一版本（开发中）：可选力量配合不惩罚独立攻击
+
+- 截图中的多段攻击被标为缺少力量来源并扣 4 分，但卡牌本身无需力量即可造成伤害。Strength 配对现在只添加存在来源时的边际收益，不扣缺少可选增强的分；毒等必须有来源的兑现机制仍保留缺口惩罚。
+- RunAdviceChecks 105,782 项通过，新增独立攻击与无角色等价、缺少力量配合为 0、毒兑现依赖仍受约束三个检查；RunAdviceCaptureChecks 51 项通过，Release 编译通过。
+- 只修改建议评分，未改变战斗潜力或模拟。已有 UI 渲染证据覆盖展示链路，本次不把旧截图的具体分数当作修复后结果；未重新启动游戏或安装。
+
+
+## 下一版本（开发中）：原生画像 UI 验证与标签遮挡修复
+
+- `RUN-ADVICE` 在游戏 v0.111.0 / RitsuLib 0.5.18 的独立 Windows 渲染实例通过，run `5784bfb22108497e9a47284c2a440437`，27.29 秒，请求上限 120 秒且完成自动退出。可重跑参数见 `coverage/unattended/run-advice-profile-ui.json`；安装路径由 launcher 覆盖。
+- 新增真实 CardCmd 升级 8 张兑现牌后的捕获检查；真实商店购买检查金币、牌组、已售标签移除及剩余商品评分刷新；真实奖励页检查重掷、摘要替换、eng/zhs/zht 原位语言刷新、小数兑现权重与评分 Readiness 的展示一致。
+- 首轮 run `875fdf6f25d84521bfb8d28822800f54` 合同通过，但截图显示长明细覆盖卡名和商品图标。修复后商店仅直接显示分数与简短原因，完整分解/覆盖范围/理由写入 tooltip；标签使用 Pass 允许事件向父控件传递，略过按钮标签保持 Ignore。奖励标签按实际文本高度向上放置，语言刷新同时重新定位。
+- 查看修复后的商店与奖励截图，样本中的卡名、牌面与商品图标不再被长明细覆盖。截图和请求结果保留于本地 `.local/`，不提交二进制。渲染使用原生 launcher 的临时本地副本，仅把 headless 换为 windowed/resolution 并显示窗口；已删除副本。
+- Release 编译与 diff 格式检查通过。该测试证明原生结构、捕获、购买刷新和中文样本排版；没有人工鼠标悬停验收或各种分辨率覆盖，也不构成战斗策略提升幅度证明。玩家正式 Mod 安装未改动。
+
+
+## 下一版本（开发中）：画像显示与权重评分一致
+
+- 画像详情不再把兑现权重取整为组件张数；供给和兑现权重均保留一位小数，能反映已审查升级效果。
+- 摘要及详情显示同一 Readiness × 100 配合指数，直接复用评分模型；说明它是供需启发式而非胜率，未审查机制不计入，避免把缺少覆盖误解为角色没有配合。
+- 中英文模板及数值格式同步；Release 编译和占位符一致性检查通过。未进行可见排版验收，此项不改变搜索、奖励分数或游戏安装。
+
+
+## 开发中：兑现牌升级捕获与评分（2026-09-09）
+
+- `dotnet run --project tools/RunAdviceCaptureChecks/RunAdviceCaptureChecks.csproj -c Release`：51 项通过，新增 40 项。逐牌检查捕获后改变 live 动态值不会改旧快照、升级在有供给时提高配合分与画像强度、奖励及同价商店排序一致、无供给时不虚增配合。
+- 覆盖 Accuracy (AccuracyPower 4→6)、FeelNoPain (Power 3→4)、Reflex (Cards 2→3)、Tactician (Energy 1→2)、Haunt (HpLoss 7→9)、DevourLife (DevourLifePower 1→2)、Defragment (FocusPower 1→2)、Accelerant (Accelerant 1→2)。变量及升级来自本地游戏 v0.111.0 定向反编译；未升级兑现强度为 1，升级按效果比例变化，已有统一上限保留。
+- Release 编译通过，0 warnings / 0 errors。这是捕获/纯评分检查，不是原生奖励页、商店页或复杂战斗 A/B。既有原生战斗回归验证的是战斗模块，不会用它证明本次建议评分改动。
+
+
+## 开发中：原生药水库存与画像路线验证（2026-09-09）
+
+- Windows 游戏 v0.111.0 / RitsuLib 0.5.18，独立 headless 实例，当前源码 `736c7fc` 的既有 Release 产物；固定单 worker、3 秒短搜、单请求 120 秒上限。
+- `smart-potion-inventory-open.json`：Passed，1 瓶能量药水时不用药，预计损血 3、敌人剩余 HP 0；run `b1375ed06b7e41f3a865c4c0341289c3`。
+- `smart-potion-inventory-full.json`：Passed，3 瓶时使用 1 瓶，省血 3 / 准入要求 3、预计损血 0、敌人剩余 HP 0；run `1d1dd6ee6398490a93b79ddfeffcd9e5`。
+- `smart-potion-inventory-no-benefit.json`：Passed，满栏但初始能量足够无损击杀时不用药；run `19dcb946be3d4e2789dea2f0f2b1bd30`。
+- `smart-potion-inventory-deploy.json`：Passed，Instant / 0 秒实际部署满栏路线，第 1 回合胜利、最终 HP 至少 70、计划外重算 0；run `b04e608cc12747af89b9075deb7fb118`。
+- `profile-shiv-deploy.json`：Passed，首张 Accuracy，再 Blade Dance / 小刀击杀 24 HP 敌人，第 1 回合胜利、HP 至少 70、计划外重算 0；run `740c8ce7ad1d402e974a88c9d2a60b26`。
+- `profile-strength-deploy.json`：Passed，首张 Inflame，再 Twin Strike 击杀 14 HP 敌人，第 1 回合胜利、HP 至少 70、计划外重算 0；run `d9b002eb3eab42bb98918b55e5eb9459`。
+- 两个画像组合初次请求因误用成对 ID/标题断言失败；已改为 `expectedInitialFirstActionCardId` 后通过。夹具验证组合在原生搜索与部署中可用，不是旧版/新版 A/B，也不证明复杂牌组中启发式的提升幅度。画像 UI、商店和奖励页面仍未做可见测试。
+- 结果与请求保留于本地 `.local/inventory-*/`。前三项只断言初始搜索，部署项额外断言真实游戏结果；不声称逐字段 actual/simulated 差分或可见 Steam 性能提升。
+- 启动前缺少默认用户测试设置，已从现有 Steam settings 复制到隔离 profile；未改玩家存档或安装。原生加载报告 RitsuLib 重复 ID，但单个依赖成功初始化、测试入口正常；本轮不将该环境提示当作算法故障。
+
+
+## 下一版本（开发中）：小刀一次性与复用潜力
+
+- 现有小刀潜力按当前分支 Exhaust 关键词区分一次性与可重复。一次性实例不能因为预计多个牌组循环而反复贡献攻击次数；不消耗的特殊小刀保留重复使用估计。
+- RunAdviceChecks 105,779 项通过，新增全一次性、全可复用和混合三项检查；Release 编译通过。仍是有限行动预算下的估计，不证明能量与抽牌循环可执行。
+- 原生短搜、药水生命周期及完整画像作用于出牌的验收尚未完成；未运行游戏或安装。
+
+
+## 下一版本（开发中）：力量命中次数接入战斗
+
+- CardMechanismFacts.AttackHits 由奖励捕获与战斗共用，核对的固定两段、Repeat 多段使用真实段数；未知攻击保留原单段近似。
+- StrategicEffectContext 新增可选 AttackHits 与需求位；Build 按分支存活牌估计玩家攻击命中次数，排除 OstyAttack。StrengthPower 消费此项，其他按攻击牌次数计数的 Power 保持 AttackPlays。
+- RunAdviceChecks 105,776 项通过，新增固定段数不读无关 Repeat、升级段数、未知单段三项；Release 编译通过。上下文 Build→Evaluate 已静态核对，尚未原生搜索验证。
+- 该入口仍为潜力估计，不替代伤害模拟；实际流派出牌效果、药水生命周期与界面验收等目标仍待完成，未安装。
+
+
+## 下一版本（开发中）：力量与多段画像
+
+- 定向核对原生 Inflame：按 StrengthPower 变量给予力量，升级增加变量。捕获力量量，并将效果持续性与 Power 打出一次区分。
+- TwinStrike/RipAndTear 固定两段、SwordBoomerang 按 Repeat 作为已审查力量收益组件；PayoffWeight 表示收益入口量，配合画像/边际分数共同读取并限幅 4。RipAndTear 同时补齐基础多段伤害。
+- 画像新增力量多段轴；不泛化未审查攻击，不将玩家力量套用 Osty 攻击。RunAdviceChecks 105,773 项通过，新增段数影响配合与画像轴识别；Release 编译通过。
+- 该批仍是有限已审查构筑规则，暂未覆盖所有力量/多段卡或战斗 StrengthPower 的多段预估；目标其余战斗接入和实际搜索验证继续进行，未安装。
+
+
+## 下一版本（开发中）：毒与 Doom 的来源依赖
+
+- 定向核对原生 Accelerant/AccelerantPower、DeadlyPoison、NoEscape。Accelerant 自身不施毒，依赖 Poison 重复触发；NoEscape 基础施加 Doom 并从既有 Doom 获得额外量。
+- 已识别 DeadlyPoison/NoxiousFumes 为毒来源、Accelerant 为收益组件；EndOfDays/NoEscape 同时具备 Doom 来源与收益角色。画像增加两轴，已识别角色不再重复叠通用 Poison/Doom 标签分。
+- NoxiousFumes 作为延迟持续来源，不把能力启动一次等同于只产生一次效果。EndOfDays 的即时结算与 NoEscape 放大仍共用宏观轴；本批不把 Doom 分数当作即时伤害。
+- RunAdviceChecks 105,771 项通过（新增施毒依赖、自带来源不误扣两项）；Release 编译通过。名单有限，不是完整毒/Doom 卡池覆盖；真实搜索和 UI 验证仍未执行，目标继续进行。
+
+
+## 下一版本（开发中）：生成小刀的行动预算
+
+- 战斗估计新增生成动作占用：以现存牌与预计生成牌的周期规模分摊有限行动预算，生成牌与小刀攻击不能同时占用同一次动作。
+- EstimatedShivPlays 独立为纯值函数，供战斗消费；不是完整能量/抽牌模拟。保留当前分支供给与原行动预算上限，不新增真实卡牌或修改模拟状态。
+- RunAdviceChecks 105,769 项通过；新增 23 项覆盖一动作不能生成并攻击、四动作可生成并打三刀、已有小刀无需生成及预算上限。Release 编译通过。
+- 未做原生搜索验证，不能据此声称对实际行动次数精确预测。其余画像与药水验证仍待完成，未安装。
+
+
+## 下一版本（开发中）：小刀生成事实接入战斗评估
+
+- 新增 src/Strategy/CardMechanismFacts 纯值事实入口，奖励捕获与战斗 StrategicEffectContext 共用已审查的即时小刀生成数量；Search 不依赖 UI 或实时奖励捕获。
+- Accuracy 的 ShivPlays 估计现在包含当前分支 liveCards 内 BladeDance/CloakAndDagger/FanOfKnives 可生成的小刀，受既有 reachableCards 行动预算约束；InfiniteBlades 的延迟生成不冒充即时产出。已消耗来源不在 liveCards 时不贡献未来供给。
+- RunAdviceChecks 105,746 项、CaptureChecks 11 项通过；Release 编译通过。新增共享数量、延迟排除、未知来源排除三项检查。仍需目标短搜验证，不将编译和纯值合同当作出牌质量提升证据。
+- 本批是共同机制事实开始用于出牌的具体入口，尚非全画像战斗接入；其他机制与药水跨回合验证仍未完成。
+
+
+## 下一版本（开发中）：满栏药水准入容量合同
+
+- 将 Coordinator 的付费药水容量计算集中到 PotionInventoryValue.PaidCapacity，首瓶门槛加后续完整门槛，禁止累计多次槽位折扣。
+- PotionInventoryChecks 21,220 项通过，枚举普通门槛 1..20、首瓶门槛 1..普通值、省血预算 0..100，与逐瓶累加参考结果比较；另覆盖终局 Boss 禁止性哨兵、负预算及 3/11/12 点边界。
+- 核对 ActEndingBossPolicy：当前正普通门槛映射为原值、五倍或禁止性哨兵，PaidCapacity 的正数前提成立。PreserveResources 在当前代码主要针对被盗资源，未将其重新解释为禁止药水。
+- Release 编译通过。此合同只证明准入预算公式，不替代真实搜索/最终路线/跨回合药水库存验证；画像战斗接入与剩余目标继续进行。
+
+
+## 下一版本（开发中）：星星与锻造画像
+
+- 新增星星供需与锻造兑现轴，允许同时存在。星星来源含初始与折算供给，需求按耗星组件计数，X 仅作为一个需求组件，不伪造固定费用。
+- 产星候选使用画像配合程度的边际增量，替代供需跨阈值的 3/1 权重跳变。
+- 锻造画像承认 Forge 会生成剑，以基础能量评估基础攻击入口，不要求牌组永久持有 Token；不宣称捕获真实手牌和本回合可支付性。
+- RunAdviceChecks 105,743 项通过（新增四项：双轴并存、自动生成剑、产星递减、X 需求标记）；Release 编译通过。
+- 图片/界面与实战仍未验证；战斗共享画像和剩余角色轴、药水一致性审计尚未完成。未安装到游戏。
+
+
+## 下一版本（开发中）：能力启动与持续供给分离
+
+- 定向读取当前原生 InfiniteBladesPower.BeforeHandDraw：在拥有者抽牌前按 Amount 创建小刀。InfiniteBlades 现归入 ShivSource，保留 0.5 启动可用权重，但不把能力牌只打一次等同于只产出一次。
+- Corruption 的消耗入口也不再仅因 Power 类型套一次性供给折扣；其他未核对 Power 不泛化此例外。
+- CaptureChecks 11 项通过，新增两项对应上述捕获行为；RunAdviceChecks 105,739 项通过；Release 编译通过。权重仍是奖励启发式，不模拟未来具体触发次数。
+- 画像战斗接入、其他流派轴及药水策略实际搜索验收尚未完成。未安装或运行游戏。
+
+
+## 下一版本（开发中）：小刀来源与增幅画像
+
+- 增加 ShivSource/ShivPayoff，已核对的 BladeDance、CloakAndDagger、FanOfKnives 使用 Cards/Shivs 生成数量，Accuracy 作为增幅组件。来源与增幅通过边际配合程度评分，画像新增小刀轴。
+- 已识别角色不再重复获得通用 Shiv 标签协同，避免规则迁移产生双计。
+- RunAdviceChecks 105,739 项通过，新增来源依赖、通用标签不双计和画像轴识别三项检查；Release 编译通过。
+- InfiniteBlades 等持续生成需要区分一次性启动与跨回合供给，暂未归入新角色。其他画像轴与战斗接入、药水生命周期验证继续进行；不宣称当前名单覆盖全小刀体系。未运行游戏或安装。
+
+
+## 下一版本（开发中）：X 费用标记
+
+- AdviceCard 独立记录 EnergyX/StarsX；捕获不再伪造固定 2 能量/1 星星。零占位值仅配合 X 标记存储，固定高费统计、费用惩罚和低费攻击遗物配合均排除 EnergyX。
+- X 星星识别初始/已审查产星支持，理由明确效果依赖实际投入；X 能量也显示非固定费用限制。不据此假定具体伤害次数或可支付量，已识别 X 牌的效果曲线还需后续补充。
+- RunAdviceChecks 105,736 项、CaptureChecks 九项通过；Release 编译通过。新增覆盖 X 低费误判、高费统计、星星支持及原始捕获标记。
+- 任务仍未完成：画像完整接入战斗、更多角色轴、药水跨回合与保留策略审计、目标短搜和界面实测仍待处理。未安装或运行游戏。
+
+
+## 下一版本（开发中）：运转短板与消耗抽牌保路
+
+- 画像新增抽牌、高费缺能量、直接格挡组件偏少提示；仅为已捕获组件计数的启发式，不将间接防御或未识别机制解释为绝对缺失。
+- 抽牌分按牌组厚度和已有抽牌密度连续递减，能量分按高费需求/已有产能平滑计算，替代固定加分和四张高费阈值跳变。
+- 战斗 StrategicEffectModel 的 DarkEmbracePower 从通用 Scaling 转为按预测 ExhaustPlays 与 AverageCardValue 估计 CardAccessPotential，沿现有中间保路入口生效；不修改实际消耗/抽牌 Hook，也不改变终局质量比较。仍沿用现有 ExhaustPlays 近似，主动消耗选择与 Ethereal 时点未得到完整刻画。
+- RunAdviceChecks 105,733 项通过（新增四项运转短板检查）；Release 编译 0 warnings/errors。DarkEmbrace 战斗改动仅经静态调用链和编译检查，未运行目标短搜，不宣称已改善实际路线。
+- 共享画像完整接入出牌、其他流派轴、X 费用、药水跨回合审计和实机验证仍为当前目标未完成项。
+
+
+## 下一版本（开发中）：可查看的多体系画像
+
+- DeckProfileSnapshot 输出五条已实现的来源/收益轴及抽牌、能量、格挡、高费、部分审查卡数，不把牌组锁定为单一流派。
+- 奖励/商店复用同次捕获的 AdviceContext，摘要显示最多两条主要已识别配合与运转组件数，悬停列出全部轴和覆盖数量；中英文同步。摘要计数不是强度或胜率，未覆盖方向不能解释为不存在。
+- RunAdviceChecks 105,729 项通过，新增多体系并存与运转能力独立计数；Release 编译通过。真实布局/悬停仍未实机验收。
+- 当前画像仅覆盖已审查的五条轴，其他角色方向和画像接入出牌搜索仍在进行中；该提交没有实现学习模型或改变战斗终局排序。
+
+
+## 下一版本（开发中）：牌组机制画像与边际抓牌
+
+- 引入纯值 MechanismBalance（供给、收益组件、配合程度），对弃牌、消耗、Soul、召唤/Osty、Focus 分别建模，不将多体系牌组锁定为唯一流派。
+- PairValue 改为加入候选前后的配合程度增量；两侧互相依赖，饱和递减，供给短缺优先补供给，收益短缺优先补收益。保留明确的无来源提示与惩罚；新增部分仍属启发式，不代表训练模型。
+- RunAdviceChecks 105,727 项通过，新增四项检查覆盖单边组件无完整配合、瓶颈两侧价值、配合增益的获取顺序无关性；CaptureChecks 八项通过，Release 编译通过。
+- 已接入奖励/商店评分；尚未接入战斗中间保路，不能声称出牌已经使用该画像。战斗当前已有 StrategicEffectContext/StrategicEffectModel，需要沿其输入与保路用途接入，避免重复计入已有 Power 价值。药水真实搜索验证、X 费用与剩余机制覆盖继续进行。
+
+
+## 下一版本（开发中）：药水库存与牌组理解（进行中）
+
+- 新需求：平衡模式避免药水长期满栏；抓牌从独立牌面分走向牌组结构；启发式/后续学习画像同时帮助抓牌和战斗保路。保留此前 X 费用与覆盖优化任务。
+- 当前已定位普通/较高/高价值药水省血门槛为 9/14/18；MaximumSmartPotionUses 在无药损血不足门槛时可直接阻止付费药水搜索。
+- 首版库存折扣：搜索根满栏且路线使用可选普通药水时，只折扣一个槽位（普通 9→3），高价值药水单独不打折，强制指令不享受该可选折扣。接入 Coordinator 搜索容量、反事实成本及 FinalPlanOrdering；不修改药水实际效果。
+- PotionInventoryChecks 五项纯函数检查通过；Release 编译通过。尚未运行真实搜索验证，药水保留政策/中间排序一致性与跨回合库存生命周期仍需审计；不能据此声称实战囤药已解决。
+- 下一步实现牌组画像共享入口及抓牌边际评估，随后接入战斗中间保路；不以静态流派标签改写实际终局胜负/血量。不宣称已有训练数据或学习模型。
+
+
+## 下一版本（开发中）：删牌遗物连锁与有限资源边界
+
+- 删牌除了比较存活卡，还比较已持有且已识别遗物的删除前后牌组价值，避免忽略跨过连续攻击等配合阈值。诅咒也进入连锁评估，保留原有 DuVuDoll 基础删牌处理。
+- 有限产星与初始星星合并评估；可用权重为零的重复产星不再被判作有效持续来源。
+- RunAdviceChecks 105,723 项通过，本轮新增五项：已持有遗物阈值、删牌顺序无关性、通用体系损失、不可用产星、初始与有限供给合并。Release 编译通过；未运行游戏。
+- 这些测试验证已有评分规则的依赖传播，不证明遗物阈值权重或整局推荐质量。更广泛卡牌/遗物覆盖、X 费用及战斗时序评估仍需继续研究和实现，不能把本批视为全机制覆盖。
+
+
+## 下一版本（开发中）：评分连续性与分项修正
+
+- 通用 Poison/Doom/Shiv 协同、连续攻击遗物、费用随机遗物与 Claw 同名协同均计入配合分；评分一次计算后直接投影分项，避免独立重算机制导致分类遗漏。
+- 牌面分在原 14 分阈值之后改为对数递增，保持连续且边际递减，高伤害/格挡不再全部硬封顶为同分。
+- 产星供需应用可用时点和一次性折扣，单次来源不再使用持续供给理由，已识别可重复来源与初始/有限供给分开。
+- 删牌比较扩展到所有存活卡的 CardValue 前后变化，纳入牌组比例、通用标签、费用支持和遗物相关卡牌规则；保留 ±20 连锁变化限幅。该规则仍不声称评价整个未来路线。
+- 本阶段新增七项检查；尚需完成整批覆盖边界审计与更完整的删牌连锁专项用例。未安装或运行游戏。
+
+
+## 下一版本（开发中）：建议评分缺口验收
+
+- Forge 改用捕获的 player.MaxEnergy 作为基础能量，避免固定三能量。战斗内临时能量 Hook、未来抽牌与费用变化仍不冒充已知条件。
+- 新增 RunAdviceCaptureChecks，直接链接生产捕获代码，使用 API 形状的测试替身检查八项捕获合同：多段/动态基础伤害、产量/时点/一次性、快照独立、Severance、未知 Power、起始遗物/基础能量及覆盖标记。原生程序集接口由 Release 编译验证；没有声称运行了原生 Hook。
+- RunAdviceChecks 105,711 项通过；CaptureChecks 八项通过；Release 编译通过。未启动游戏、未安装，真实排版和推荐收益待玩家验证。
+- 本批对应六项缺口：删牌前后依赖比较；已审查起始来源；产量/时点/一次性；已审查动态/多段牌面与 Power 分类；界面覆盖和分数分项；Forge 费用窗口及 Soul/NoDraw 冲突。均为有界奖励评分规则，不是完整战斗预测；未识别卡和遗物明确保留覆盖边界。
+
+
+## 下一版本（开发中）：基础伤害与兑现限制
+
+- 主线程捕获将 TwinStrike 的固定两段、SwordBoomerang/SovereignBlade 的 Repeat 纳入总伤害；Unleash/SoulStorm 保留 CalculationBase，不把未知未来 Osty HP 或消耗堆数量当作实际增伤。无已识别召唤来源时不为 OstyAttack 计算基础输出奖励。
+- Forge 来源奖励扣除强化后支付剑费用的压力，当前采用三能量、剑费用二的参考窗口，并有限考虑牌组能量支持。这是牌组启发式而非当回合可支付证明；实际费用变化与初始能量尚需捕获层进一步校准。
+- Soul 来源遇到抽牌禁止组件时降低配合价值，补齐原先只识别直接抽牌卡的冲突。
+- RunAdviceChecks 105,710 项通过；本批新增七项覆盖固定/变量多段、动态基础伤害、未知变量、Forge 费用/能量支持、Soul 与抽牌禁止。Release 编译通过（0 warnings/errors）。未运行游戏或安装。
+- 整体仍待捕获层专项合同、起始能量校准与最终需求逐项审计，不以本批纯数据测试替代完整捕获验证。
+
+
+## 下一版本（开发中）：来源时点与评分透明度
+
+- 来源配对按产量、可用时点和一次性使用折扣计权，限定单来源产量上限 4。GraveWarden/Reave 使用实际 Cards 变量并折算抽牌堆延迟，Severance 分别计入手牌/抽牌堆/弃牌堆机会；Glacier、IceLance、ConsumingShadow 使用对应产球数量。折扣为启发式，非触发概率或精确回合预测。
+- 不再给所有 Power 无条件加持续效果分，仅保留已列出的持续效果规则。
+- AdviceRating 提供基础/配合/价格分项并在建议标签显示；原生卡也标为参考分，区分部分建模与通用参考，不再用原生程序集身份暗示完整机制覆盖。Known 仍保留原有支持/排名门禁用途。
+- RunAdviceChecks 新增产量、延迟、一次性来源、分数分项守恒和未知卡门禁检查；本阶段合计 105,703 项断言通过。Release 编译通过；真实中英文排版与游戏交互未验证。
+- 整体缺口补齐仍进行中：动态伤害/多段基础牌面、更多负面配合与兑现窗口，以及捕获层的专项合同尚未完成。
+
+
+## 下一版本（开发中）：建议评分缺口补齐（进行中）
+
+- 删牌按实际牌组下标移除，先在剩余牌组计算被删牌价值，再比较其余组件删除前后的机制配合。避免被删牌自身触发同名惩罚，并计入拆掉唯一来源的代价；机制变化限制在 ±20 参考分。该方法仍为启发式，不是整局收益预测。
+- 主线程捕获原生 DivineRight 的初始星星、BoundPhylactery 的召唤量、CrackedCore 的初始 Lightning；初始星星仅抵消首次可支付时的来源缺口，不当作持续产星。
+- 集中来源扩展到 ColdSnap、Darkness、ConsumingShadow、IceLance、Chill，集中药水同时考虑初始球。规则来自原生遗物定向读取及当前产球镜像，不泛化未知遗物。
+- RunAdviceChecks 105,697 项断言通过；Release 编译 0 warnings/errors。本次没有游戏运行或安装。剩余工作：覆盖提示与评分分项、来源产量/时点、动态牌面、负面配合与兑现窗口。
+
+
+## 下一版本（开发中）：复杂机制建议评分
+
+- Soul 生成来源与打出／消耗收益分别标识，来源配合统一计分，避免同一组件重复加分；召唤来源与已识别的 Osty 攻击配对。
+- Forge 自带生成剑的能力，不要求牌组预先持有剑；来源奖励递减，理由明确后续攻击才能兑现。此处是有限启发式，不预测实际可支付或攻击窗口。
+- 移除通用 Orb 标签协同，集中及集中药水只匹配已识别的受集中影响的产球来源；Plasma 不冒充此类来源。
+- 本批只覆盖 AdviceMechanics 中显式列出的卡牌；未纳入全部遗物、初始球、条件生成与其他来源，缺少来源提示不等于本局绝无来源。Doom 阈值、球顺序、Osty 真实承伤仍留给战斗评估。
+- RunAdviceChecks 105,688 项断言通过（本轮新增 13 项）；Release 编译通过，0 warnings/errors。中文理由与英文映射已同步。未运行游戏、未安装，也未验证实际策略质量。
+
+
+## 下一版本（开发中）：机制驱动的奖励评分首批
+
+- 增加 AdviceRole，显式区分主动弃牌／弃牌收益、主动消耗／自消耗／消耗收益及抽牌禁止。入口与收益组件配对计分，已有入口或收益组件越多边际奖励越低；只有收益组件而没有已识别入口时提示缺口。
+- 星星成本与产出独立于能量；仅对已核对的 Glow、GatherLight、ShiningStrike、SolarStrike、BigBang 捕获产星，不凭 Stars 变量猜全部效果。星星供需评分是牌组持续供给参考，不是当前战斗可支付判定；初始星星、遗物产星及 X 星数值尚未完整建模。
+- Battle Trance 标注本回合后续抽牌受限并根据其他抽牌组件计代价；Claw 不再统一按同名牌扣分。多标签通用协同取最高有效项，不因固定枚举顺序选中较弱配合，也不累加出无限奖励。
+- `tools/RunAdviceChecks` 共 105,675 项断言通过，其中 20 项新增机制合同；原价格连续性合同保留。覆盖入口有无、收益独立、边际递减、抽牌冲突、星星供需、规则映射、未知产星来源、双标签顺序及同名 Claw。
+- Release 构建通过（0 warnings/errors）。未运行原生捕获／奖励购买／语言切换 UI 或整局策略质量验证。数据在主线程捕获，算法只接收值；未修改战斗搜索、消耗候选剪枝或自动执行。Forge、Soul／Osty、Doom 阈值与球序继续待后续独立实现。
+
+## 下一版本（开发中）：无目标收益路线回退
 
 - 收益约束仅对产生正向目标收益的路线生效；永久成长为实际成长点数，净资源为正净资源分。无收益或负净收益时，目标排序打平，交回既有血量／资源策略；不再仅因低于收益血量底线暂停完整获胜路线的全自动。
 - 有收益但越过限制的路线仍低于无收益保命路线；有收益且满足限制的路线仍优先。临时结果、终局和药水比较共用 Objective 合同。无完整胜利路线的自动暂停规则保持。
@@ -2349,3 +2650,7 @@ pwsh -NoProfile -File tools\run-unattended-test.ps1 -ScenarioId MONSTER-MOVES-BA
 - “通过”必须有同一 `runId` 的 `Passed` 结果，并核对对应 `SEARCH_REQUEST`、`RESULT`、`ACTION`、`DEPLOY_*` 和真实怪物行动日志。
 - 只编译通过、只看到最终胜利或只看模拟结果都不能标记为通过。
 - `RID/resources still in use at exit` 当前记录为 Godot 退出噪音；任何 `CombatSolver/Unattended FAILED`、`SEARCH_FAILURE`、`DEPLOY_FAILURE` 或状态断言失败均判定场景失败。
+
+### Corruption exhaust fuel closeout
+
+Active Corruption counts ordinary Skills as exhaust fuel once and bounds Skill-based Shiv generators to one use. Native RUN-ADVICE checks cover ordinary Skills, existing Exhaust cards and finite Cloak and Dagger supply.
