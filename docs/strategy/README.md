@@ -1,5 +1,6 @@
 # 策略与搜索研究
 
+- [复杂机制调查（0.111.0）](complex-mechanisms-research-20260909.md)：Forge、Soul、Osty、Doom 与充能球顺序的结算依据及评分边界。
 - [角色体系与建议评分调查（0.111.0）](archetype-advice-research-20260909.md)：五角色机制、原生实现样本、评分缺口和分阶段验收。
 
 [返回文档导航](../README.md)
