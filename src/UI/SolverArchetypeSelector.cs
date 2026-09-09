@@ -8,7 +8,7 @@ internal sealed partial class SolverArchetypeSelector : VBoxContainer
     private readonly OptionButton _choices = new() { Name = "ArchetypePreference", SizeFlagsHorizontal = SizeFlags.ExpandFill };
     private string _character = string.Empty;
     private Action<ArchetypePreference>? _changed;
-    private const string Help = "流派倾向温和影响奖励、商店评分与战斗铺垫；保留生存优先和收益限制。自动识别保留多体系评分。仅列出已建模机制。";
+    private const string Help = "所选流派优先补齐奖励与商店的核心组件，缺少前置和重复组件降权；战斗保留温和倾向、生存优先和收益限制。自动识别保留多体系评分。仅列出已建模机制。";
 
     internal SolverArchetypeSelector()
     {

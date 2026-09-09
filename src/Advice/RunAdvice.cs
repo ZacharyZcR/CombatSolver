@@ -9,7 +9,7 @@ internal enum AdviceTag
 
 internal enum AdviceCoverage { Unreviewed, Partial }
 
-internal sealed record AdviceScoreParts(double Base, double Synergy, double Price);
+internal sealed record AdviceScoreParts(double Base, double Synergy, double Price, double Preference = 0);
 
 internal enum AdviceKind { Card, Relic, Potion, Removal, Skip }
 
@@ -59,11 +59,12 @@ internal static class RunAdvice
         int? removalIndex = null;
         double value;
         double synergy = 0;
+        double preference = 0;
         switch (offer.Kind)
         {
             case AdviceKind.Card:
                 known = offer.Card?.Known == true;
-                value = offer.Card is { } card ? CardValue(context, card, reasons, out synergy) : 0;
+                value = offer.Card is { } card ? CardValue(context, card, reasons, out synergy, out preference) : 0;
                 break;
             case AdviceKind.Relic:
                 (value, known) = RelicValue(context, offer.Id, reasons);
@@ -109,15 +110,16 @@ internal static class RunAdvice
         }
         if (!known) reasons.Add("效果规则未覆盖");
         return new AdviceRating(offer, value, 0, available, known, reasons, removalId, removalIndex,
-            new AdviceScoreParts(beforePrice - synergy, synergy, value - beforePrice));
+            new AdviceScoreParts(beforePrice - synergy, synergy, value - beforePrice, preference));
     }
 
     internal static double CardValue(AdviceContext context, AdviceCard card, List<string> reasons)
-        => CardValue(context, card, reasons, out _);
+        => CardValue(context, card, reasons, out _, out _);
 
-    private static double CardValue(AdviceContext context, AdviceCard card, List<string> reasons, out double synergy)
+    private static double CardValue(AdviceContext context, AdviceCard card, List<string> reasons, out double synergy, out double preference)
     {
         synergy = 0;
+        preference = 0;
         if (card.Curse) { reasons.Add("增加牌组负担"); return -25; }
         int size = Math.Max(1, context.Deck.Count);
         double attacks = context.Deck.Count(c => c.Attack || c.Damage > 0) / (double)size;
@@ -172,9 +174,10 @@ internal static class RunAdvice
         }
         if (synergy > 0) reasons.Add("契合现有体系");
         synergy += AdviceMechanics.Value(context, card, reasons);
-        double preferenceBonus = ArchetypeCatalog.AdviceBonus(context, card);
-        synergy += preferenceBonus;
-        if (preferenceBonus > 0) reasons.Add("符合手动流派倾向（温和加权）");
+        preference = ArchetypeCatalog.AdviceBonus(context, card);
+        synergy += preference;
+        if (preference > 0) reasons.Add(preference <= 2
+            ? "符合所选流派，但缺少前置或已有重复组件" : "优先补充所选流派的核心与缺口");
         if ((context.Relics.Contains("KUNAI") || context.Relics.Contains("SHURIKEN")
                 || context.Relics.Contains("ORNAMENTAL_FAN")) && card.Attack && !card.EnergyX && card.Cost <= 1)
         { synergy += 4; reasons.Add("配合连续攻击遗物"); }

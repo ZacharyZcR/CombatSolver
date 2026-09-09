@@ -50,6 +50,8 @@ internal static class RunAdviceBadge
             if (!titleOnly && rating.Parts is { } parts)
                 reason = SolverText.Format($"基础 {parts.Base:F1} / 配合 {parts.Synergy:F1} / 价格 {parts.Price:F1}")
                     + "\n" + reason;
+            if (rating.Parts is { Preference: > 0 } preferenceParts)
+                reason += "\n" + SolverText.Format($"流派倾向 +{preferenceParts.Preference:F1}（已计入配合）");
             label.TooltipText = title + "\n" + reason + "\n"
                 + string.Join("\n", rating.Reasons.Select(SolverText.Get));
             label.Text = titleOnly ? title : compact ? compactText : title + "\n" + reason;

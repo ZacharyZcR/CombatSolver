@@ -42,7 +42,7 @@ foreach (var (character, preference, id, roles) in new[]
     foreach (bool shop in new[] { false, true })
     {
         double delta = RunAdvice.Rank(chosen, [offer], shop)[0].Score - RunAdvice.Rank(automatic, [offer], shop)[0].Score;
-        Check(Math.Abs(delta - 5) < 1e-9, "Explicit preference affects both reward and shop scores by a bounded bonus");
+        Check(delta > 0 && delta <= 24, "Explicit preference affects both reward and shop scores by a bounded role-aware bonus");
     }
     Check(ArchetypeCatalog.AdviceBonus(chosen with { Deck = [card, card, card, card] }, card) < 5,
         "Preference saturates instead of forcing excessive copies");
@@ -342,4 +342,41 @@ Check(CardMechanismFacts.EstimatedShivPlays(2, 0, 0, 2, 6, reusableExisting: 2) 
     "Non-exhausting special Shivs retain repeat-use potential");
 Check(CardMechanismFacts.EstimatedShivPlays(2, 0, 0, 2, 6, reusableExisting: 1) == 4,
     "Mixed reusable and exhausting Shivs are counted separately");
+var weightedSource = new AdviceCard("BLADE_DANCE", 12, 0, 0, 1, false, false, false, true,
+    AdviceTag.Shiv, Roles: AdviceRole.ShivSource, SourceAmount: 3);
+var weightedPayoff = new AdviceCard("ACCURACY", 0, 0, 0, 1, false, false, false, true,
+    AdviceTag.Shiv | AdviceTag.Scaling, Roles: AdviceRole.ShivPayoff);
+var weightedAttack = new AdviceCard("AREA_REFERENCE", 25, 0, 0, 1, true, false, false, true, AdviceTag.Area);
+var weightedDefend = new AdviceCard("DEFEND_REFERENCE", 0, 5, 0, 1, false, true, false, true, AdviceTag.None);
+var weightedStrike = new AdviceCard("STRIKE_REFERENCE", 6, 0, 0, 1, true, true, false, true, AdviceTag.None);
+var weightedDeck = Enumerable.Repeat(weightedStrike, 6).Concat(Enumerable.Repeat(weightedDefend, 4))
+    .Concat(new[] { weightedSource, weightedSource }).ToArray();
+var weightedContext = context with { Deck = weightedDeck, Gold = 200, Preference = ArchetypePreference.Shiv };
+AdviceOffer[] weightedOffers = [new("engine", AdviceKind.Card, weightedPayoff.Id, 50, weightedPayoff),
+    new("attack", AdviceKind.Card, weightedAttack.Id, 50, weightedAttack), new("skip", AdviceKind.Skip, "skip")];
+foreach (bool shop in new[] { false, true })
+{
+    var chosen = RunAdvice.Rank(weightedContext, weightedOffers, shop);
+    var automatic = RunAdvice.Rank(weightedContext with { Preference = ArchetypePreference.Automatic }, weightedOffers, shop);
+    double previous = automatic[0].Score + 5d / (1 + 2 * 0.25);
+    Check(previous < automatic[1].Score && chosen[0].Rank == 1,
+        "Supported core payoff now beats generic area damage that dominated the old manual preference");
+    Check(Math.Abs(chosen[0].Parts!.Preference - (chosen[0].Score - automatic[0].Score)) < 1e-9,
+        "UI preference contribution equals the actual selected-archetype score change");
+    Check(Math.Abs(chosen[0].Parts!.Base + chosen[0].Parts!.Synergy + chosen[0].Parts!.Price - chosen[0].Score) < 1e-9,
+        "Displayed preference is a subset of synergy and must not be counted twice");
+    Console.WriteLine($"ARCHETYPE_COMPARISON shop={shop} old_payoff={previous:F2} new_payoff={chosen[0].Score:F2} area={chosen[1].Score:F2}");
+}
+Check(ArchetypeCatalog.AdviceBonus(weightedContext with { Deck = [] }, weightedPayoff) <= 2,
+    "Selecting Shiv without a generator does not treat Accuracy as a functioning engine");
+Check(ArchetypeCatalog.AdviceBonus(weightedContext with { Deck = Enumerable.Repeat(weightedSource, 6).ToArray() }, weightedPayoff)
+    >= ArchetypeCatalog.AdviceBonus(weightedContext, weightedPayoff),
+    "Additional sources must not suppress the first missing payoff");
+Check(ArchetypeCatalog.AdviceBonus(weightedContext with { Deck = [weightedPayoff, weightedPayoff] }, weightedSource)
+    > ArchetypeCatalog.AdviceBonus(weightedContext with { Deck = [weightedSource, weightedSource] }, weightedSource),
+    "Missing fuel is preferred to redundant fuel");
+Check(ArchetypeCatalog.AdviceBonus(weightedContext with { Deck = [weightedSource, weightedPayoff, weightedPayoff, weightedPayoff] }, weightedPayoff)
+    < ArchetypeCatalog.AdviceBonus(weightedContext, weightedPayoff), "Repeated payoff copies diminish");
+Check(ArchetypeCatalog.AdviceBonus(weightedContext, weightedSource with { Availability = 0 }) == 0,
+    "An unavailable source is not rewarded as a core component");
 Console.WriteLine($"RUN_ADVICE_CHECKS_OK checks={checks}");

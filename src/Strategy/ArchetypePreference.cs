@@ -76,8 +76,45 @@ internal static class ArchetypeCatalog
         && !card.Basic && ((Roles(preference) & card.Roles) != 0
             || preference == ArchetypePreference.Stars && (card.Stars > 0 || card.StarCost > 0 || card.StarsX));
 
-    internal static double AdviceBonus(AdviceContext context, AdviceCard card) => Matches(context.Preference, card)
-        ? 5d / (1 + context.Deck.Count(c => Matches(context.Preference, c)) * 0.25) : 0;
+    private static AdviceRole Sources(ArchetypePreference preference) => preference switch
+    {
+        ArchetypePreference.Strength => AdviceRole.StrengthSource,
+        ArchetypePreference.Exhaust => AdviceRole.ExhaustSource | AdviceRole.SelfExhaust,
+        ArchetypePreference.Poison => AdviceRole.PoisonSource,
+        ArchetypePreference.Shiv => AdviceRole.ShivSource,
+        ArchetypePreference.Discard => AdviceRole.DiscardSource,
+        ArchetypePreference.Forge => AdviceRole.ForgeSource,
+        ArchetypePreference.Doom => AdviceRole.DoomSource,
+        ArchetypePreference.Soul => AdviceRole.SoulSource,
+        ArchetypePreference.Summon => AdviceRole.SummonSource,
+        ArchetypePreference.FocusOrbs => AdviceRole.FocusOrbSource,
+        _ => AdviceRole.None,
+    };
+
+    internal static double AdviceBonus(AdviceContext context, AdviceCard card)
+    {
+        if (!Matches(context.Preference, card)) return 0;
+        AdviceRole sources = Sources(context.Preference);
+        AdviceRole payoffs = Roles(context.Preference) & ~sources;
+        bool stars = context.Preference == ArchetypePreference.Stars;
+        MechanismBalance current = stars ? DeckMechanismProfile.Stars(context)
+            : DeckMechanismProfile.Capture(context, sources, payoffs);
+        double supply = stars ? AdviceMechanics.StarSupply(card)
+            : (card.Roles & sources) != 0 ? AdviceMechanics.SourceWeight(card) : 0;
+        double payoff = stars ? card.StarCost > 0 || card.StarsX ? 1 : 0
+            : (card.Roles & payoffs) != 0 ? Math.Clamp(card.PayoffWeight, 0, 4) : 0;
+        if (supply + payoff <= 0) return 0;
+        int copies = context.Deck.Count(c => c.Id == card.Id);
+        double duplicateFactor = 1 + copies * 0.7;
+        // Choosing a direction is not evidence that an unsupported payoff already works.
+        if (supply == 0 && current.Supply <= 0) return 2 / duplicateFactor;
+        var after = new MechanismBalance(current.Supply + supply, current.Payoffs + payoff);
+        double total = current.Supply + current.Payoffs + 2;
+        double gap = (supply > 0 ? 8 * (current.Payoffs + 1) / total : 0)
+            + (payoff > 0 ? 8 * (current.Supply + supply) / total : 0);
+        double progress = 24 * (after.Readiness - current.Readiness);
+        return Math.Min(24, 8 * Math.Min(1, supply + payoff) + Math.Min(8, gap) + progress) / duplicateFactor;
+    }
 
     // A non-accumulating action tie-break. It never awards repeated plays or changes terminal HP ordering.
     internal static double ActionBonus(ArchetypePreference preference, string? cardId) => cardId is not null
