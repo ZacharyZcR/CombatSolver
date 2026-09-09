@@ -751,7 +751,7 @@ internal static class SolverOverlay
         if (_progressText != null)
             _progressText.Visible = false;
         SetReviewText(snapshot.ReviewSummaryText);
-        bool hasRouteDetails = !string.IsNullOrEmpty(snapshot.DetailsText);
+        bool hasRouteDetails = snapshot.Objective != null || !string.IsNullOrEmpty(snapshot.DetailsText);
         SetPerformanceHintVisible(
             hasRouteDetails
             && snapshot.ProjectedBattleHpLossKnown

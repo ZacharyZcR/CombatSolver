@@ -14,7 +14,12 @@ internal static class SearchObjectiveText
     internal static string Summary(SearchObjectiveOutcome outcome)
     {
         string name = SolverText.Get(Name(outcome.Policy.Mode));
-        return SolverText.Format($"目标：{name} · 永久成长 {outcome.Growth.Total} 点 · 净收益参考分 {outcome.NetResourceScore}");
+        string summary = SolverText.Format($"目标：{name} · 永久成长 {outcome.Growth.Total} 点 · 净收益参考分 {outcome.NetResourceScore}");
+        if (outcome.Policy.Mode == SearchObjective.PermanentGrowth || outcome.Growth.Total != 0)
+            summary += "\n" + SolverText.Format($"预计永久成长：生命 {outcome.Growth.MaxHp:+0;-0;0} · 伤害 {outcome.Growth.CardDamage:+0;-0;0} · 格挡 {outcome.Growth.CardBlock:+0;-0;0}");
+        if (outcome.Policy.Mode == SearchObjective.NetResources || outcome.NetResourceScore != 0)
+            summary += "\n" + SolverText.Format($"预计收益：金币 {outcome.GoldGain:+0;-0;0} · 待结算 {outcome.PendingGold} · 选牌 {outcome.ExtraCardRewards} 次 · 药水 {outcome.PotionCountChange:+0;-0;0} 瓶");
+        return summary;
     }
 
     internal static string FullAutoStop(SearchObjectiveOutcome outcome, bool completeVictory)
@@ -34,6 +39,9 @@ internal static class SearchObjectiveText
     internal static string Details(SearchObjectiveOutcome outcome)
     {
         string detail = SolverText.Format($"本次路线收益：最大生命 {outcome.Growth.MaxHp:+0;-0;0} · 永久伤害 {outcome.Growth.CardDamage:+0;-0;0} · 永久格挡 {outcome.Growth.CardBlock:+0;-0;0}\n金币净变化 {outcome.GoldGain:+0;-0;0} · 待结算金币 {outcome.PendingGold} · 药水数量净变化 {outcome.PotionCountChange:+0;-0;0} · 额外选牌奖励 {outcome.ExtraCardRewards}");
+        detail += "\n" + SolverText.Format($"净收益构成：金币 {outcome.GoldGain:+0;-0;0} + 待结算 {outcome.PendingGold} + 选牌奖励分 {outcome.ExtraCardRewards * 30} + 药水价值变化 {outcome.PotionValueChange:+0;-0;0} − 保命遗物消耗 {outcome.DeathSaveCost} = {outcome.NetResourceScore} 分");
+        detail += "\n" + SolverText.Format($"预计结束血量 {outcome.EndingHp} HP · 本场累计战损 {outcome.BattleHpLoss} HP");
+        detail += "\n" + SolverText.Get("以上为本次搜索路线的预测增量，不是已经到账的收益；重新搜索时重新计量。");
         if (outcome.Policy.IsRewardObjective)
         {
             if (!outcome.HasObjectiveGain)
