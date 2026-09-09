@@ -29,6 +29,9 @@ Measure("energy-constrained", [(1, 0, 6), (2, 0, 13), (1, 0, 8), (0, 0, 4), (3, 
 Measure("dual-resource", [(1, 2, 6), (2, 0, 13), (1, 4, 8), (0, 0, 4), (3, 1, 20)], 3, 5);
 Measure("all-affordable", [(1, 2, 6), (2, 0, 13), (1, 4, 8), (0, 0, 4), (3, 1, 20)], 9, 10);
 
+Measure("stars-unconstrained", [(1, 2, 6), (2, 0, 13), (1, 4, 8), (0, 0, 4), (3, 1, 20)], 3, 7);
+Measure("energy-unconstrained", [(1, 2, 6), (2, 0, 13), (1, 4, 8), (0, 0, 4), (3, 1, 20)], 7, 3);
+
 void Compare((int Energy, int Stars, int Value)[] cards, int energy, int stars)
 {
     int expected = Original(cards, energy, stars);

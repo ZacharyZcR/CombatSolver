@@ -9,3 +9,5 @@ dotnet run --project tools/ReachableHandValueChecks/ReachableHandValueChecks.csp
 Links the production value calculation, compares it exactly with the original two-dimensional recurrence, then measures fixed-input allocation. Covers free cards, both resources, empty hands, large tables, duplicate entries, and value-sum overflow. The original model/cost-hook collection path is not exercised here.
 
 Timing is a local microbenchmark, not evidence of full-search throughput or visible game performance. The managed allocation assertion applies only to the tested small DP tables, not the entire snapshot.
+
+Single-resource surplus cases also verify dimension reduction when all candidate costs fit one resource. Full-search speedup remains unmeasured.
