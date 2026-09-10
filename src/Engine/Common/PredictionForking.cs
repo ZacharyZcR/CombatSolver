@@ -14,6 +14,10 @@ internal interface ICombatPredictionHookListenerSource
     IReadOnlyList<MegaCrit.Sts2.Core.Models.AbstractModel> HookListeners { get; }
 
     IReadOnlyList<MegaCrit.Sts2.Core.Models.AbstractModel> RunHookListeners { get; }
+
+    IReadOnlyList<MegaCrit.Sts2.Core.Models.AbstractModel> MirroredHookListeners => HookListeners;
+
+    IReadOnlyList<MegaCrit.Sts2.Core.Models.AbstractModel> MirroredRunHookListeners => RunHookListeners;
 }
 
 /// <summary>
@@ -140,9 +144,6 @@ internal interface ICombatPredictionCardExecutionSink
 {
     IDisposable BeginCardExecutionScope();
 
-    IDisposable BeginHistorySensitiveCardModifierScope(
-        CombatSolver.Engine.Common.PredictedCard card);
-
     IDisposable BeginCardPowerApplication(CombatSolver.Engine.Common.PredictedCard card);
 
     void RecordCardPlayStarted(
@@ -177,6 +178,12 @@ internal interface ICombatPredictionEnemyDeathSink
 
 internal interface ICombatPredictionEffectSink
 {
+    void RecordTenderCardPlayed(MegaCrit.Sts2.Core.Entities.Creatures.Creature owner);
+
+    void SpawnStockReplacement(
+        CombatSolver.Engine.InCombat.Simulation.CombatPredictionSimulator simulator,
+        MegaCrit.Sts2.Core.Models.Powers.StockPower power);
+
     void SummonOsty(
         CombatSolver.Engine.InCombat.Simulation.CombatPredictionSimulator simulator,
         MegaCrit.Sts2.Core.Entities.Players.Player player,

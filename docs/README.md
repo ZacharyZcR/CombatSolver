@@ -1,5 +1,7 @@
 # CombatSolver 文档导航
 
+当前增强分支：[0.35.1-enhanced.1](releases/0.35.1-enhanced.1-RELEASE_NOTES.md)。上游与增强版历史分别保留。
+
 玩家安装、操作与兼容性说明见 [项目 README](../README.md)。源码规则见 [AGENTS.md](../AGENTS.md)。
 
 ## 当前文档
@@ -9,10 +11,16 @@
 | 组件职责、状态所有权和调用链 | [架构与职责地图](ARCHITECTURE.md) |
 | 本批未发布改动、版本演进与开发记录 | [开发笔记](DEVELOPMENT_NOTES.md) |
 | 已执行测试、复跑方式和未验证范围 | [测试矩阵](TEST_MATRIX.md) |
+| 跨跑局卡顿、第三方 Mod 性能取证 | [进程全程性能录制](performance/long-session-recording.md) |
+| 最新快照/重放复查与 PR 验证 | [快照与重放热点复查](performance/snapshot-replay-followup-20260909.md) |
+| 保路元数据合入证据 | [perf-2 选择性合入与后续热点试验](performance/perf2-integration-20260909.md) |
+| 上一轮性能目标与逐轮证据 | [回合结束探针与元数据热路径](performance/standpat-and-metadata-20260909.md) |
 | 无人测试环境与请求协议 | [无头测试](HEADLESS_TESTING.md) |
 | 在线状态、隐私设置与管理后台 | [在线统计](ONLINE_STATISTICS.md) |
+| 跑局胜负、连胜、历史快照与筛选 | [跑局战绩](RUN_STATISTICS.md) |
 | 创意工坊中英文介绍与语言字段 | [创意工坊介绍](workshop/README.md) |
 | 玩家问题包、检查点恢复与回放 | [检查点回放](CHECKPOINT_REPLAY.md) |
+| 2026-09-09 22:56 的 34 份实验体报告 | [实验体批次修复与未定位项](issues/test-subject-reports-20260909.md) |
 | 问题包目录、提交元数据和后台筛选口径 | [报告协议](BUG_REPORT_PROTOCOL.md) |
 | 188 份计划外重算报告的分类与高频修复 | [2026-09-08 重算分诊](issues/report-replans-20260908.md) |
 | 0.33.0 修复批次的剩余问题与交接 | [2026-09-07 修复交接](issues/report-logic-bugs-20260907-handoff.md) |

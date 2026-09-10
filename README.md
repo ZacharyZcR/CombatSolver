@@ -1,14 +1,13 @@
 # 战斗路线求解器 / Combat Solver
 
-> 0.34.6 试玩：成长侧栏可选平衡、保命、永久培养、净收益目标。收益模式设置累计战损上限和最低结束血量；培养目标按本次路线的永久成长点数计算，0 表示不限，重新搜索重新计量。结果展示成长、金币与药水净变化；净收益分属于规则估值，不保证整局最优。
->
-> 0.34.6 preview: the growth sidebar offers Balanced, Survival, Permanent Growth, and Net Resources objectives. Reward modes support battle HP-loss and ending-HP limits. The growth target counts permanent points from the current search root (0 = unlimited) and resets on a new search. Results show growth and net gold/potions; resource scores are heuristic values, not whole-run guarantees.
+> 个人增强分支，基于上游 v0.35.1，保留奖励／商店评分、流派选择、搜索目标及满栏药水策略。与上游发布版功能不同。
+> Personal enhanced fork based on upstream v0.35.1, retaining reward/shop advice, archetype selection, search objectives and contextual potion policy.
 
 Combat Solver 是一个面向《杀戮尖塔 2》单人模式的战斗路线求解器。进入战斗后，它会在后台模拟当前手牌、牌堆、敌人行动、药水、遗物、选牌和跨回合状态，并在预算范围内给出推荐路线、预计战损与关键行动。
 
 玩家可以只查看建议，也可以让求解器执行当前回合，或连续接管整场战斗。搜索不会修改游戏 RNG，也不会在后台操作真实战斗状态。
 
-当前本地试玩版本为 **0.34.6**：新增搜索目标选择，战后选牌与商店显示具体评分。详见 [更新日志](docs/releases/0.34.6-RELEASE_NOTES.md)。
+当前增强试玩版本为 **0.35.1-enhanced.1**。目标为有限值，旧配置的 0 使用默认额度；重新搜索重新计量。详见 [增强版说明](docs/releases/0.35.1-enhanced.1-RELEASE_NOTES.md) 与 [上游维护边界](ENHANCED.md)。
 
 **English UI:** Set the game language to English and restart the game. CombatSolver provides a recommended route; use **Play turn** for one turn or **Auto: On** for continuous play. Configure potions, growth and search budgets in the overlay. **Settings > Reports > Upload report** submits a bug report. Logs, raw errors and some detailed diagnostics retain their original text. Single-player only.
 

@@ -7,6 +7,8 @@
 
 这份文档讲：默认会发生什么、有哪些登记点、登记的纪律、怎么验证自己做对了。
 
+HeavenlyDrill 的 OnPlay 使用精确镜像，先解析分支 X 值及修正，再按卡牌 Energy 阈值决定攻击次数翻倍。修改该卡的阈值或攻击流程需提供对应语义登记，通用“X次攻击”推断不足以表达条件翻倍。EndOfDays 的领域补偿在每次施加灾厄后结算能力数量变化监听器和死亡，再判断处决；登记类似监听器时应保留原版 await 时点。
+
 ## 0. 先判断你要不要读下去
 
 | 你的 Mod | 要做什么 |
@@ -18,7 +20,9 @@
 前两条是自动的。第三条不做适配的话，装上你的 Mod 之后求解器会直接停在
 「检测到不兼容的第三方 Mod」，玩家用不了。
 
-项目明确拒绝的玩法 Mod 优先于上述通用放行条件。当前 `WheelchairSpire` 按 Mod ID 或已加载程序集名识别，在根捕获时直接报告不兼容；不依据 `affects_gameplay: false` 放行。本批问题修复不为其数值、目标类型或效果改写提供适配。
+项目明确拒绝的玩法 Mod 优先于上述通用放行条件。当前 `WheelchairSpire`、`PengoTarot`、`BetterCharacterRelics` 按 Mod ID 或已加载程序集名识别，在根捕获时直接报告名称和不兼容原因；不依据 `affects_gameplay: false` 放行。本批不为这些 Mod 提供战斗适配。搜索、部署和回合准备捕获此异常时均使用专用提示，报告账本只记录不兼容类别，不引导玩家上传日志。包内仅出现其他 Mod 的名字或恢复环境不匹配，均不足以认定该 Mod 是某个偏差的原因。
+
+Power 的原版克隆会重置 `_internalData`。跨根保留的数据必须从原生来源捕获：例如本批苍蓝星球的已触发标记，以及 DarkEmbrace 的虚无消耗延迟计数。DarkEmbrace 后续按实际事件累计并在回合末清零，不能用结束回合前的牌数代替此状态。
 
 ## 1. 求解器默认怎么对待未知内容
 
@@ -77,6 +81,12 @@ XxxMirrors.Registry.Register<TYourType>(handler);
 
 44 张注册表按域分布在 `src/Engine/InCombat/Mirrors/` 下：
 
+死亡后生成单位的镜像应保持原生生成时点。例如补货由 `AfterDeathMirrors` 调用分支生成入口，旧个体仍在阵容中，其最大生命参与替补生命判重。把生成延后到阵容清理后，即使 RNG 调用次数相同也会改变抽样结果；登记镜像时应同步移除原领域补偿中的同一生成动作。
+
+逐次出牌完成效果也应由 `AfterCardPlayedMirrors` 的对应分派独占。温柔在该 Hook 更新计数并扣除属性，回合末仍使用既有领域计数恢复；父牌的历史扫描可能包含已经结算的内层自动牌，不能再通过该范围给内层牌重复施加效果。属性施加需遵守每次原生命令的战斗结束条件。
+
+历史敏感计算变量需要冻结根历史并加上分支新增事件。谋杀的实现读取 `RootCombatHistorySnapshot.CardsDrawn` 与模拟器抽牌事件；原生完成初始抽牌或后续动作后，旧预测根的倍率仍保持不变。只在实机停住时做一次差分会漏掉这类问题，验证时应包含根捕获后的实机推进与 Fork 隔离。
+
 | 目录 | 注册表数 | 覆盖什么 | 你多半要用的 |
 |---|---|---|---|
 | `Hooks/` | 37 | 战斗 hook：攻击、格挡、伤害、死亡、卡牌、球体、回合边界 | 按你重写了哪个 hook 挑，例如 `AfterDamageGivenMirrors` |
@@ -95,6 +105,10 @@ XxxMirrors.Registry.Register<TYourType>(handler);
 
 同一张表里 `Register` 用的是 `Dictionary.Add`，**重复登记会抛异常**，不会静默覆盖。
 
+Hook 分发会省略当前原版类型继承的默认空回调，但保留第三方/动态类型的完整回调顺序和既有登记流程。原生与领域监听表仍保留全部成员；关键字查询仅在所有接收者均未参与 `TryModifyKeywordsInCombat` 时省去原生空调用。每次根捕获重新检查相关 `AbstractModel` 基方法和 `Hook.ModifyKeywordsInCombat` 的 Harmony 补丁，有补丁或不透明 BaseLib CardModifier 时旁路。类型布局在同一根的有界表中复用，完整类型顺序逐项相等才命中，只存元数据、不保留任何分支 Model。原生监听表可在内部按前段与卡牌/球后段拼接，但顺序不变；不透明 CardModifier 仍完整重建，附着监听追加器拿到完整列表，不能把新增 Power 的插入位置限定在原生前段。该优化没有增加原本不支持的补丁或 subscriber 适配。
+
+`PowerModel.GetTypeForAmount` 的局部 IL 优化只移除两处同类型枚举比较的装箱。虚拟 `StackType`、`Type`、`AllowNegative` getter 的次数与顺序及 decimal 分支保持原样；方法体不符合精确指令形状或比较内部存在控制流入口时保留原 IL。这没有增加 Power 登记点，也不缓存第三方 getter 的结果。
+
 ### 2.2 战略估值：会改变出牌顺序的 Power
 
 ```csharp
@@ -103,6 +117,8 @@ StrategicEffectMirrors.Register<TYourPower>(requirements, evaluate, host);
 
 只有当你的 Power **收益取决于它和别的动作的先后关系**时才需要。详见
 [第三方 Power 的战略估值登记](third-party-strategic-effects.md)。
+
+`StrategicEffectRequirements.AttackHits` 可请求可达攻击命中数；`StrategicEffectContext.AttackHits` 在请求后提供估值，未请求时为 null。它包括已审查的原版多段与小刀生成，第三方攻击使用普通单次命中估计，不能当作真实攻击结算。`ExhaustDrawPlays` 是黑暗之拥在禁抽、虚无顺序下的抽牌机会估值；这些字段只服务保路，不改变 Hook 镜像语义。
 
 不登记的后果：求解器按叠加层数记一点 `ScalingPotential` 兜底。对大多数 Power 够用；对
 「自己不给甲、但让后续攻击给甲」这类会被排到错误位置。

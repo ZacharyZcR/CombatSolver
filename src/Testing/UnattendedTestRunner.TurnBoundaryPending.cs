@@ -195,6 +195,7 @@ internal sealed partial class UnattendedTestRunner
 
         Creature enemy = simulatedCombat.Enemies.First();
         simulatedCombat.Apply<VulnerablePower>(enemy, 1, player.Creature);
+        simulatedCombat.BeginSideTurn(player.Creature);
         simulatedCombat.BeginActionChoices((IReadOnlyList<PlanCardChoice>?)null);
         try
         {
@@ -316,19 +317,12 @@ internal sealed partial class UnattendedTestRunner
             .ToArray();
         listenersField.SetValue(combat, replacement);
 
-        foreach (string cacheName in new[]
-                 {
-                     "_baseHookListeners",
-                     "_effectiveHookListeners",
-                     "_effectiveRunHookListeners",
-                     "_effectivePowers",
-                 })
-        {
-            FieldInfo cache = typeof(SimulatedCombatState).GetField(
-                cacheName,
-                BindingFlags.Instance | BindingFlags.NonPublic)
-                ?? throw new MissingFieldException(typeof(SimulatedCombatState).FullName, cacheName);
-            cache.SetValue(combat, null);
-        }
+        // The fixture replaces an otherwise immutable root. Use the production
+        // invalidation boundary so newly added derived caches cannot retain that root.
+        MethodInfo invalidate = typeof(SimulatedCombatState).GetMethod(
+            "InvalidateBaseHookListeners",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingMethodException(typeof(SimulatedCombatState).FullName, "InvalidateBaseHookListeners");
+        invalidate.Invoke(combat, null);
     }
 }

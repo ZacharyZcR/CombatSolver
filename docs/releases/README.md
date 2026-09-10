@@ -1,12 +1,15 @@
 # 版本更新日志
 
+当前增强分支：[0.35.1-enhanced.1](0.35.1-enhanced.1-RELEASE_NOTES.md)。上游与增强版历史分别保留。
+
 [返回文档导航](../README.md)
 
 按版本倒序列出已有玩家更新日志，包括历史草案。是否正式发布以对应 Git 标签和发布记录为准；未发布改动见 [开发笔记](../DEVELOPMENT_NOTES.md)。发布 ZIP 存放在仓库根目录的 `releases/`，此处只保存文档。
 
 | 版本系列 | 更新日志 |
 |---|---|
-| 0.34 | [0.34.9 试玩](0.34.9-RELEASE_NOTES.md) · [0.34.8 试玩](0.34.8-RELEASE_NOTES.md) · [0.34.7 试玩](0.34.7-RELEASE_NOTES.md) · [0.34.6 试玩](0.34.6-RELEASE_NOTES.md) · [0.34.5 试玩](0.34.5-RELEASE_NOTES.md) · [0.34.4](0.34.4-RELEASE_NOTES.md) · [0.34.3](0.34.3-RELEASE_NOTES.md) · [0.34.2](0.34.2-RELEASE_NOTES.md) · [0.34.1](0.34.1-RELEASE_NOTES.md) · [0.34.0](0.34.0-RELEASE_NOTES.md) |
+| 0.35 | [0.35.1](0.35.1-RELEASE_NOTES.md) · [0.35.0](0.35.0-RELEASE_NOTES.md) |
+| 0.34 | [0.34.10](0.34.10-RELEASE_NOTES.md) · [0.34.9](0.34.9-RELEASE_NOTES.md) · [0.34.8](0.34.8-RELEASE_NOTES.md) · [0.34.7](0.34.7.md) · [0.34.6](0.34.6-RELEASE_NOTES.md) · [0.34.5](0.34.5-RELEASE_NOTES.md) · [0.34.4](0.34.4-RELEASE_NOTES.md) · [0.34.3](0.34.3-RELEASE_NOTES.md) · [0.34.2](0.34.2-RELEASE_NOTES.md) · [0.34.1](0.34.1-RELEASE_NOTES.md) · [0.34.0](0.34.0-RELEASE_NOTES.md) |
 | 0.33 | [0.33.9](0.33.9-RELEASE_NOTES.md) · [0.33.8](0.33.8-RELEASE_NOTES.md) · [0.33.7](0.33.7-RELEASE_NOTES.md) · [0.33.6](0.33.6-RELEASE_NOTES.md) · [0.33.5](0.33.5-RELEASE_NOTES.md) · [0.33.4](0.33.4-RELEASE_NOTES.md) · [0.33.3](0.33.3-RELEASE_NOTES.md) · [0.33.2](0.33.2-RELEASE_NOTES.md) · [0.33.1](0.33.1-RELEASE_NOTES.md)（并入 0.33.2） · [0.33.0](0.33.0-RELEASE_NOTES.md) |
 | 0.32 | [0.32.0](0.32.0-RELEASE_NOTES.md) |
 | 0.31 | [0.31.3](0.31.3-RELEASE_NOTES.md) · [0.31.2](0.31.2-RELEASE_NOTES.md) · [0.31.1](0.31.1-RELEASE_NOTES.md) · [0.31.0](0.31.0-RELEASE_NOTES.md) |
@@ -32,3 +35,11 @@
 - [0.34.12 抓牌流派权重](0.34.12-RELEASE_NOTES.md)
 
 - [0.34.13 六项策略优化](0.34.13-RELEASE_NOTES.md)
+
+## 增强分支历史
+
+- [0.34.5 增强试玩](0.34.5-enhanced-RELEASE_NOTES.md)
+- [0.34.6 增强试玩](0.34.6-enhanced-RELEASE_NOTES.md)
+- [0.34.8 增强试玩](0.34.8-enhanced-RELEASE_NOTES.md)
+- [0.34.9 增强试玩](0.34.9-enhanced-RELEASE_NOTES.md)
+- [0.34.10 增强试玩](0.34.10-enhanced-RELEASE_NOTES.md)

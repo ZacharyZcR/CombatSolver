@@ -68,6 +68,9 @@ internal sealed partial class UnattendedTestRunner
             }
             if (request.ScenarioId == "UI-LOCALIZATION")
             {
+                RunStatistics.Start(MegaCrit.Sts2.Core.Nodes.NGame.Instance!);
+                if (MegaCrit.Sts2.Core.Nodes.NGame.Instance!.GetNodeOrNull("CombatSolverRunStatistics") != null)
+                    throw new InvalidOperationException("Headless statistics must remain inactive.");
                 await runner.AssertUiLocalizationAsync(combatState);
                 return Observation(combatEnded: false);
             }
@@ -131,12 +134,24 @@ internal sealed partial class UnattendedTestRunner
                 runner._completedChecks.Add("LivingFogSummonIntentAndExplosionNativeFork");
                 return Observation(combatEnded: false);
             }
+            if (request.ScenarioId == "COMBAT-TIMING-LIFETIME")
+            {
+                await runner.AssertCombatTimingLifetimeAsync(combatState, player);
+                return Observation(combatEnded: true);
+            }
+            if (request.ScenarioId == "PERFORMANCE-RECORDING-LIFETIME")
+            {
+                PerformanceRecording.VerifyHostReattachmentForTesting();
+                await Task.Delay(TimeSpan.FromSeconds(15));
+                runner._completedChecks.Add("PerformanceObserverReattachmentKeepsProcessRecorder");
+                return Observation(combatEnded: false);
+            }
             if (request.ScenarioId == "ONLINE-PRESENCE-CONTRACT")
             {
                 if (!OnlinePresence.IsHeadless()) throw new InvalidOperationException("Presence fixture requires headless isolation.");
-                if (!new SolverSettingsData().OnlineStatisticsEnabled
+                if (new SolverSettingsData().OnlineStatisticsEnabled
                     || SolverSettings.RoundTripForTesting(new SolverSettingsData { OnlineStatisticsEnabled = false }).OnlineStatisticsEnabled)
-                    throw new InvalidOperationException("Presence opt-out did not persist.");
+                    throw new InvalidOperationException("Presence default-off or opt-out did not persist.");
                 OnlinePresencePayload payload = OnlinePresence.Capture("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "test");
                 if (payload.Floor != combatState.RunState.TotalFloor || payload.Character.Length == 0 || payload.Encounter.Length == 0 || payload.HpLoss != null)
                     throw new InvalidOperationException("Presence scalar snapshot differs from the current combat.");
@@ -229,6 +244,12 @@ internal sealed partial class UnattendedTestRunner
                 runner._completedChecks.Add(request.ScenarioId);
                 return Observation(combatEnded: false);
             }
+            if (request.ScenarioId == "HELLRAISER-TURN-START-HISTORY")
+            {
+                await runner.AssertHellraiserTurnStartHistoryAsync(combatState, player);
+                runner._completedChecks.Add(request.ScenarioId);
+                return Observation(combatEnded: false);
+            }
             if (request.ScenarioId == "SUMMONED-ALLY-POWER-ORDER")
             {
                 await runner.AssertSummonedAllyPowerOrderAsync(combatState, player);
@@ -254,6 +275,72 @@ internal sealed partial class UnattendedTestRunner
                 runner.SetStage("replay_start_history");
                 await runner.AssertReplayStartHistoryAsync(combatState, player);
                 runner._completedChecks.Add("ReplayStartHistory");
+                return Observation(combatEnded: false);
+            }
+            if (request.ScenarioId is "TENDER-NESTED-SLY" or "TENDER-DISCARD-ALL-SLY")
+            {
+                await runner.AssertTenderNestedAsync(combatState, player);
+                runner._completedChecks.Add(request.ScenarioId);
+                return Observation(combatEnded: false);
+            }
+            if (request.ScenarioId == "FOREGONE-IMPLICIT-ORDER")
+            {
+                await runner.AssertForegoneSelectionAsync(combatState, player);
+                runner._completedChecks.Add(request.ScenarioId);
+                return Observation(combatEnded: false);
+            }
+            if (request.ScenarioId == "HISTORY-COURSE-EMPTY-TURN")
+            {
+                await runner.AssertHistoryCourseEmptyTurnAsync(combatState, player);
+                runner._completedChecks.Add(request.ScenarioId);
+                return Observation(combatEnded: false);
+            }
+            if (request.ScenarioId.StartsWith("REPORT-ROUND-", StringComparison.Ordinal))
+            {
+                await runner.AssertReportRoundAsync(combatState, player);
+                runner._completedChecks.Add(request.ScenarioId);
+                return Observation(combatEnded: false);
+            }
+            if (request.ScenarioId.StartsWith("REPORT-CARDS-", StringComparison.Ordinal))
+            {
+                await runner.AssertReportCardSequenceAsync(combatState, player);
+                runner._completedChecks.Add(request.ScenarioId);
+                return Observation(combatEnded: false);
+            }
+            if (request.ScenarioId == "TEST-SUBJECT-ORIGINAL-REPORT")
+            {
+                await runner.AssertTestSubjectReportAsync(combatState, player);
+                runner._completedChecks.Add("TestSubjectOriginalReportTurn2");
+                return Observation(combatEnded: false);
+            }
+            if (request.ScenarioId == "REPLAY-BOUNDARY-CONTRACT")
+            {
+                await runner.AssertReplayBoundaryContractAsync(player);
+                runner._completedChecks.Add("ReplayLegacyHistoryAndBoundaryFailure");
+                return Observation(combatEnded: false);
+            }
+            if (request.ScenarioId == "CLONE-EVENT-ISOLATION")
+            {
+                runner.AssertCloneEventIsolation(player);
+                runner._completedChecks.Add(request.ScenarioId);
+                return Observation(combatEnded: false);
+            }
+            if (request.ScenarioId == "NIGHTMARE-SELECTION-SNAPSHOT")
+            {
+                await runner.AssertNightmareSnapshotAsync(combatState, player);
+                runner._completedChecks.Add(request.ScenarioId);
+                return Observation(combatEnded: false);
+            }
+            if (request.ScenarioId == "MURDER-ROOT-HISTORY")
+            {
+                await runner.AssertMurderRootHistoryAsync(combatState, player);
+                runner._completedChecks.Add(request.ScenarioId);
+                return Observation(combatEnded: false);
+            }
+            if (request.ScenarioId is "STOCK-RESPAWN-HP" or "STOCK-THORNS-RESPAWN-HP" or "STOCK-REPORT-RESPAWN-HP")
+            {
+                await runner.AssertStockRespawnAsync(combatState, player);
+                runner._completedChecks.Add(request.ScenarioId);
                 return Observation(combatEnded: false);
             }
             if (request.ScenarioId == "DEATH-EFFECTS-ONCE")
