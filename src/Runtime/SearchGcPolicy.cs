@@ -676,11 +676,7 @@ internal static class SearchGcPolicy
         _regionExitOnlyRequested = false;
         _noGcRegionExitWithoutCollectionCountForTesting++;
 
-        bool isCombatEnd = reason is not ("no_gc_region_rollover"
-            or "no_gc_region_exhausted"
-            or "before_next_search"
-            or "no_gc_disabled");
-        _ = Task.Run(async () =>
+        _ = Task.Run(() =>
         {
             Exception? failure = null;
             TaskCompletionSource? failedManualCompletion = null;
@@ -690,9 +686,8 @@ internal static class SearchGcPolicy
             Stopwatch stopwatch = Stopwatch.StartNew();
             try
             {
-                if (isCombatEnd)
-                    await Task.Delay(System.Random.Shared.Next(3_000, 5_001));
-                // 把 No-GC 区域结束推迟到击杀后 3-5s（奖励环节），让用户体感没有卡顿。
+                // Search ownership is already released. Do not hold the process-wide
+                // region open through rewards or delay the next search's admission.
                 if (endNoGcRegion)
                     EndNoGcRegion();
                 if (restoreLatencyMode)

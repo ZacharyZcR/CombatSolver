@@ -1,5 +1,11 @@
 # CombatSolver 测试清单
 
+## 2026-09-11：战后回收调度
+
+- `dotnet run --project tools/CombatSolver.GcPolicyChecks -c Release -- scopes`：8 项通过，验证 scope 生命周期、并发释放和取消等待；不证明真实 No-GC 退出暂停或战后主线程调用顺序。
+- `dotnet build CombatSolver.csproj -c Release --no-restore -p:CopyModOnBuild=false`：0 警告、0 错误。Bash 结构门禁通过，`search_files=84`。
+- 未启动或安装游戏，未测可见奖励/地图帧率。移除的是人为等待，不能将 3–5 秒写成 GC 暂停缩短量；新增取证耗时日志供后续现场关联。
+
 ## 0.35.3：PR 合并与监控版本提醒（本轮验证）
 
 - 合并后的 `dotnet run --project tools/CardHookReceiverChecks -c Release`：78 项通过；`python -X utf8 tools/EndTurnAdmissionChecks/run.py`：33 项通过；`dotnet run --project tools/CardTargetingChecks -c Release`：37 项通过；`python -X utf8 tools/DamageDealerChecks/run.py`：101 项通过；`python -X utf8 tools/PlayerDeathChecks/run.py`：42 项通过。伤害合同替身有一条 CS0649 未赋值警告；共 291 项是生产方法链接合同，尚未执行游戏原包或完整原生结算差分。

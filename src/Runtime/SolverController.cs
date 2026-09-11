@@ -1842,31 +1842,35 @@ internal static class SolverController
             || _search != null
             || PlayerTurnSetupCoordinator.IsSearching;
         Task turnSetupRelease = PlayerTurnSetupCoordinator.Reset(reason);
-        long forensicCaptureAllocatedAtStart = GC.GetTotalAllocatedBytes(precise: false);
-        Task forensicCaptureRelease = CombatBugReportExporter.CompleteCombat(
-            reason,
-            CurrentResultForBugReport,
-            DescribeReplanAudit());
-        bool automaticGcLifecycleUsed = SearchGcPolicy.AutomaticGcLifecycleUsed;
-        SearchGcPolicy.ReportCombatLifecycleAllocation(
-            Math.Max(
-                0,
-                GC.GetTotalAllocatedBytes(precise: false) - forensicCaptureAllocatedAtStart),
-            "combat_forensic_capture",
-            automaticGcLifecycleUsed);
-        SearchGcPolicy.CombatLifecyclePressure lifecyclePressure =
-            SearchGcPolicy.DetachCombatLifecyclePressure(reason);
         bool hadState = _search != null
             || _deployment != null
             || _combat.State != null
             || _combat.LatestResult != null
             || SolverOverlay.IsVisible;
-        if (_combat.SearchesStarted > 0 || _combat.ContinuationsReused > 0)
-            Entry.Logger.Info($"[CombatSolver/Test] REPLAN_SUMMARY reason={reason} {DescribeReplanCounts()}");
         _lastBugReportClassification = CaptureBugReportClassification();
         _lastManualProjectionComparison = _combat.LastManualProjectionComparison;
         CancelSearch();
         Task searchReferenceRelease = DrainSearchReferenceReleases();
+        long forensicCaptureStarted = Stopwatch.GetTimestamp();
+        long forensicCaptureAllocatedAtStart = GC.GetAllocatedBytesForCurrentThread();
+        Task forensicCaptureRelease = CombatBugReportExporter.CompleteCombat(
+            reason,
+            CurrentResultForBugReport,
+            DescribeReplanAudit());
+        long forensicCaptureAllocatedBytes = GC.GetAllocatedBytesForCurrentThread() - forensicCaptureAllocatedAtStart;
+        Entry.Logger.Info(
+            $"[CombatSolver/Test] COMBAT_END_CAPTURE reason={reason} " +
+            $"elapsed_ms={Stopwatch.GetElapsedTime(forensicCaptureStarted).TotalMilliseconds:F1} " +
+            $"allocated_bytes={forensicCaptureAllocatedBytes}");
+        bool automaticGcLifecycleUsed = SearchGcPolicy.AutomaticGcLifecycleUsed;
+        SearchGcPolicy.ReportCombatLifecycleAllocation(
+            forensicCaptureAllocatedBytes,
+            "combat_forensic_capture",
+            automaticGcLifecycleUsed);
+        SearchGcPolicy.CombatLifecyclePressure lifecyclePressure =
+            SearchGcPolicy.DetachCombatLifecyclePressure(reason);
+        if (_combat.SearchesStarted > 0 || _combat.ContinuationsReused > 0)
+            Entry.Logger.Info($"[CombatSolver/Test] REPLAN_SUMMARY reason={reason} {DescribeReplanCounts()}");
         if (searchCanceled)
             SearchCompletionNotifier.Notify(SearchCompletionNotificationKind.Canceled);
         CancelDeployment();
